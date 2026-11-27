@@ -45,6 +45,15 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 - [ ] Azure Monitor alert rule and action group (KQL documented in deploy/azure)
 - [ ] Owner-based showback in the dashboard
 
+## Estate-wide audit ([ADR 0010](decisions/0010-discovery-selection-and-local-store.md))
+
+- [x] Discovery with Azure Resource Graph (subscriptions or management groups) and environment suggestion
+- [x] Selection file merged without overwriting people's choices
+- [x] Multi-workspace audit cycle that survives failing resources
+- [x] `cosmosproof.audit` DuckDB metric model with KPI views and Parquet export, validated live
+- [ ] Web app (Databricks App) to choose resources and see the results visually
+- [ ] Scheduled job and Marketplace package switched to `cosmosproof audit`
+
 ## Before selling
 
 - [ ] Real test of how federated queries and plain JDBC reads appear in lineage
