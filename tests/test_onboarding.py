@@ -45,6 +45,7 @@ def test_grants_command():
     assert result.exit_code == 0, result.output
     out = result.output
     assert "GRANT SELECT ON SCHEMA system.access TO `app-123`;" in out
+    assert "ACCOUNT admin" in out
     assert "GRANT SELECT ON SCHEMA system.billing TO `app-123`;" in out
     assert "GRANT BROWSE ON CATALOG `main` TO `app-123`;" in out
     assert (

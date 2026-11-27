@@ -55,9 +55,14 @@ def scan(
     ),
 ) -> None:
     """Scan Unity Catalog and ADLS inventories and report unused data with evidence."""
-    from cosmosproof.scan import run_scan
+    from cosmosproof.scan import ScanError, run_scan
 
-    _write(run_scan(load_config(config)), out, markdown)
+    try:
+        report = run_scan(load_config(config))
+    except ScanError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    _write(report, out, markdown)
 
 
 @app.command()

@@ -57,17 +57,19 @@ def inventory_policy(container: str, schedule: str = "weekly") -> dict:
 def databricks_grants(application_id: str, catalogs: list[str]) -> str:
     who = f"`{application_id}`"
     lines = [
-        "-- Run in a Databricks SQL editor as a metastore admin.",
         "-- The identity must first be added to the workspace as a service principal.",
-        "-- System schemas must be enabled for the metastore (account admin).",
+        "-- Run this part in a Databricks SQL editor as a Databricks ACCOUNT admin: workspace",
+        "-- admins and metastore admins get PERMISSION_DENIED on the system catalog.",
+        "-- (An Entra ID Global Administrator can sign in at https://accounts.azuredatabricks.net",
+        "-- to act as, or appoint, an account admin.)",
         f"GRANT USE CATALOG ON CATALOG system TO {who};",
     ]
     for schema in SYSTEM_SCHEMAS:
         lines.append(f"GRANT USE SCHEMA ON SCHEMA system.{schema} TO {who};")
         lines.append(f"GRANT SELECT ON SCHEMA system.{schema} TO {who};")
     lines.append(
-        "-- BROWSE lets the identity see table metadata (names, owners, storage paths, "
-        "column names) without reading any data."
+        "-- This part can be run by each catalog's owner. BROWSE lets the identity see table "
+        "metadata (names, owners, storage paths, column names) without reading any data."
     )
     lines += [f"GRANT BROWSE ON CATALOG `{c}` TO {who};" for c in catalogs]
     lines.append(
