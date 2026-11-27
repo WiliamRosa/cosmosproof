@@ -1,0 +1,33 @@
+# cosmosproof scan -c cosmosproof.yml -o report.json -m report.md
+# ${VAR} and ${VAR:-default} read environment variables.
+
+window_days: 180          # no read in this many days means unused
+# reference_date: 2026-11-26   # defaults to today
+exclude_catalogs: [samples]
+
+databricks:
+  source:
+    type: databricks
+    max_rows: 1000000
+    timeout_seconds: 300
+    options:
+      # Either a Databricks CLI profile (`databricks auth login --profile <name>`) ...
+      profile: ${DATABRICKS_PROFILE:-DEFAULT}
+      # ... or server_hostname + access_token.
+      http_path: ${DATABRICKS_HTTP_PATH}
+
+storage:
+  - account: mydatalake
+    container: lake
+    inventory: inventory/lake-2026-11-26.csv   # Blob Inventory report for this container
+    access_tracking_since: 2026-01-15          # when last access tracking was enabled; omit if off
+
+# Your own prices per GB-month for each access tier. Without them, no cost is estimated.
+# The values below are placeholders, not real prices: copy them from your Azure agreement.
+rates:
+  currency: BRL
+  per_gb_month:
+    hot: 0.10
+    cool: 0.055
+    cold: 0.022
+    archive: 0.01

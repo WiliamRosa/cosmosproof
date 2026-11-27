@@ -1,0 +1,68 @@
+[project]
+name = "cosmosproof"
+version = "0.1.0.dev0"
+description = "Shows, with proof, what in your Azure Databricks costs money, creates risk or breaks the LGPD necessity principle without being used"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "BUSL-1.1"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Wiliam Rosa" }]
+keywords = ["azure", "databricks", "unity catalog", "adls", "finops", "lgpd", "unused data"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Information Technology",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+]
+dependencies = [
+    "cosmos-semantic>=0.5,<0.6",
+    "pydantic>=2.9",
+    "pyyaml>=6.0",
+    "pyarrow>=17.0",
+    "typer>=0.15",
+]
+
+[project.optional-dependencies]
+databricks = ["cosmos-semantic[databricks]>=0.5,<0.6"]
+
+[project.urls]
+Homepage = "https://github.com/WiliamRosa/cosmosproof"
+Issues = "https://github.com/WiliamRosa/cosmosproof/issues"
+
+[project.scripts]
+cosmosproof = "cosmosproof.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "cosmos-semantic[duckdb]>=0.5,<0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cosmosproof"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "databricks: needs a Databricks SQL warehouse (COSMOSPROOF_DATABRICKS_PROFILE and COSMOSPROOF_DATABRICKS_HTTP_PATH)",
+]
+addopts = ["-m", "not databricks"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option", "typer.Argument", "pathlib.Path"]
