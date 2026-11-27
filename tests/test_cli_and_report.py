@@ -113,3 +113,17 @@ def test_diff_classifies():
     result = diff(full, shorter)
     assert result["resolved"] == [full.findings[0].id]
     assert result["new"] == []
+
+
+def test_list_price_discount(duck):
+    config = ScanConfig(
+        reference_date=REFERENCE,
+        databricks=DatabricksConfig(
+            source={"type": "duckdb"}, system_tables=NAMES, list_price_discount=0.25
+        ),
+    )
+    producer = next(
+        f for f in run_scan(config, connector=duck).findings if f.kind == "unused_producer"
+    )
+    assert producer.monthly_cost == round(7.0 * 0.75 / 180 * 30, 2)
+    assert any("25% discount" in n for n in producer.coverage_notes)

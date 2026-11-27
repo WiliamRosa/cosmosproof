@@ -37,6 +37,9 @@ def parse_time(value: object) -> datetime | None:
         return None
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=UTC)
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        # Parquet inventory reports write timestamps as milliseconds since the epoch.
+        return datetime.fromtimestamp(value / 1000, tz=UTC)
     text = str(value).strip()
     try:
         if text.endswith("Z"):

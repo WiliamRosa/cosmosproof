@@ -90,6 +90,7 @@ class Analyzer:
         rates: Rates | None = None,
         orphan_depth: int = 2,
         producers: ProducerActivity | None = None,
+        price_discount: float = 0.0,
     ) -> None:
         self.snapshot = snapshot
         self.storages = blobs_by_storage
@@ -98,6 +99,7 @@ class Analyzer:
         self.rates = rates
         self.orphan_depth = orphan_depth
         self.producers = producers
+        self.price_discount = price_discount
         self.end = datetime.combine(reference, time.max, tzinfo=UTC)
         self.cutoff = datetime.combine(
             reference - timedelta(days=window_days), time.min, tzinfo=UTC
@@ -522,7 +524,8 @@ class Analyzer:
             cost = activity.costs.get(key)
             monthly = currency = None
             if cost and cost.currency:
-                monthly = round(cost.amount / self.window_days * 30, 2)
+                paid = cost.amount * (1 - self.price_discount)
+                monthly = round(paid / self.window_days * 30, 2)
                 currency = cost.currency
                 unit = f" {cost.unit}" if cost.unit else ""
                 evidence.append(
@@ -535,7 +538,10 @@ class Analyzer:
                     )
                 )
                 notes.append(
-                    "Cost uses Databricks list prices; contract discounts are not applied."
+                    f"Cost applies the configured {self.price_discount:.0%} discount to "
+                    "Databricks list prices."
+                    if self.price_discount
+                    else "Cost uses Databricks list prices; contract discounts are not applied."
                 )
             else:
                 notes.append("No billing data for this producer, so its cost is unknown.")

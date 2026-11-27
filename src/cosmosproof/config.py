@@ -33,6 +33,12 @@ class DatabricksConfig(BaseModel):
     producers: bool = Field(
         True, description="Analyze jobs and pipelines that feed tables nobody reads (phase 2)."
     )
+    list_price_discount: float = Field(
+        0.0,
+        ge=0,
+        lt=1,
+        description="Your contract discount on Databricks list prices, e.g. 0.2 for 20%.",
+    )
 
 
 class StorageConfig(BaseModel):
