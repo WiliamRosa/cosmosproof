@@ -200,3 +200,20 @@ def test_orphan_delta_tables_side_by_side_are_judged_separately():
     ]
     findings, _ = run([], blobs)
     assert [f.asset for f in findings] == [f"{LOC}/lab/exports/a"]
+
+
+def test_unity_catalog_managed_storage_is_never_an_orphan():
+    blobs = [
+        blob(
+            "managed/__unitystorage/catalogs/c1/tables/t1/part-0.parquet",
+            accessed=400,
+            modified=700,
+        ),
+        blob(
+            "managed/__unitystorage/catalogs/c1/tables/t1/_delta_log/0.json",
+            accessed=400,
+            modified=700,
+        ),
+    ]
+    findings, _ = run([], blobs)
+    assert findings == []

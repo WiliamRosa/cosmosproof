@@ -195,6 +195,10 @@ class Analyzer:
                 owner = next((name for loc, name in locations if _under(url, loc)), None)
                 if owner:
                     group = table_groups[owner]
+                elif "/__unitystorage/" in url:
+                    # Unity Catalog managed storage: files of a dropped managed table stay a few
+                    # days until Unity Catalog removes them itself. Not an orphan to report.
+                    continue
                 elif root := next((r for r in delta_roots if _under(url, r)), None):
                     group = orphans[root]
                 else:
