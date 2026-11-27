@@ -15,9 +15,9 @@ runner = CliRunner()
 def test_demo_report_has_all_kinds():
     report = demo_report()
     kinds = {f.kind for f in report.findings}
-    assert kinds == {"unused_table", "orphan_path", "unused_personal_data"}
+    assert kinds == {"unused_table", "orphan_path", "unused_personal_data", "unused_producer"}
     assert "main.silver.contas" not in {f.asset for f in report.findings}
-    assert report.totals()["monthly_cost"] > 0
+    assert report.totals()["monthly_cost"]["USD"] > 0
     assert "Compliance (LGPD)" in to_markdown(report)
 
 
@@ -47,11 +47,33 @@ def test_scan_end_to_end_on_duckdb(duck, tmp_path):
     assert assets == {
         ("unused_table", "main.raw.clientes"),
         ("unused_personal_data", "main.raw.clientes"),
+        ("unused_producer", "job 7 (carga clientes)"),
     }
-    cost = next(f for f in report.findings if f.reading == "cost")
+    cost = next(f for f in report.findings if f.kind == "unused_table")
     assert cost.monthly_cost == 0.02 and cost.confidence == "high"
     assert cost.details["still_fed"] is True
+    # job 7 reads its own output: that read must not make the table look used.
+    assert cost.details["last_read"].startswith("2026-01-10")
+    assert cost.details["fed_by"] == ["job 7 (carga clientes)", "job 8 (retired job)"]
     assert LOC in cost.details["storage_path"]
+
+    producer = next(f for f in report.findings if f.kind == "unused_producer")
+    assert producer.owner == "etl@bank" and producer.confidence == "medium"
+    assert producer.monthly_cost == round(7.0 / 180 * 30, 2) and producer.currency == "USD"
+    assert producer.details["tables"].keys() == {"main.raw.clientes"}
+    assert report.totals()["monthly_cost"] == {"USD": round(0.02 + producer.monthly_cost, 2)}
+    assert any("pipeline:p1 has no list price" in n for n in report.coverage_notes)
+
+
+def test_scan_without_producers(duck):
+    config = ScanConfig(
+        reference_date=REFERENCE,
+        databricks=DatabricksConfig(
+            source={"type": "duckdb"}, system_tables=NAMES, producers=False
+        ),
+    )
+    kinds = {f.kind for f in run_scan(config, connector=duck).findings}
+    assert "unused_producer" not in kinds
 
 
 def test_cli_demo_diff_and_ledger(tmp_path):

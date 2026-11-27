@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 Reading = Literal["cost", "risk", "compliance"]
 Confidence = Literal["high", "medium", "low"]
-Kind = Literal["unused_table", "orphan_path", "unused_personal_data"]
+Kind = Literal["unused_table", "orphan_path", "unused_personal_data", "unused_producer"]
 
 
 class Evidence(BaseModel):
@@ -56,22 +56,21 @@ class Report(BaseModel):
 
     def totals(self) -> dict[str, Any]:
         by_reading: dict[str, int] = {"cost": 0, "risk": 0, "compliance": 0}
-        cost = 0.0
+        costs: dict[str, float] = {}
         size = 0
-        currency = None
         for f in self.findings:
             by_reading[f.reading] += 1
             if f.reading == "cost":
                 size += f.size_bytes
-                if f.monthly_cost is not None:
-                    cost += f.monthly_cost
-                    currency = f.currency
+                if f.monthly_cost is not None and f.currency:
+                    costs[f.currency] = costs.get(f.currency, 0.0) + f.monthly_cost
         return {
             "findings": len(self.findings),
             "by_reading": by_reading,
             "unused_bytes": size,
-            "monthly_cost": round(cost, 2) if currency else None,
-            "currency": currency,
+            # Storage uses the customer's rates and compute uses list prices, possibly in
+            # different currencies: never add them together.
+            "monthly_cost": {c: round(v, 2) for c, v in sorted(costs.items())},
         }
 
 

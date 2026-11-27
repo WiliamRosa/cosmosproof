@@ -42,10 +42,8 @@ def to_markdown(report: Report) -> str:
         "- Unused storage: "
         + (_size(totals["unused_bytes"]) if totals["unused_bytes"] else "unknown (no inventory)"),
     ]
-    if totals["monthly_cost"] is not None:
-        lines.append(
-            f"- Estimated monthly cost of unused storage: {totals['monthly_cost']:.2f} {totals['currency']}"
-        )
+    for currency, value in totals["monthly_cost"].items():
+        lines.append(f"- Estimated monthly cost (storage and compute): {value:.2f} {currency}")
     if report.coverage_notes:
         lines += ["", "**Coverage notes for the whole run:**", ""]
         lines += [f"- {note}" for note in report.coverage_notes]
@@ -61,8 +59,9 @@ def to_markdown(report: Report) -> str:
             lines += [
                 f"### {f.asset}",
                 "",
-                f"`{f.kind}` · confidence **{f.confidence}** · owner {f.owner or 'unknown'} · "
-                f"{_size(f.size_bytes)}{cost}",
+                f"`{f.kind}` · confidence **{f.confidence}** · owner {f.owner or 'unknown'}"
+                + (f" · {_size(f.size_bytes)}" if f.size_bytes else "")
+                + cost,
                 "",
                 "Evidence:",
             ]
