@@ -64,7 +64,9 @@ def test_packaged_template_carries_the_attribution_pid():
     packaged = json.loads(build.packaged_template(template, pid))
     assert packaged["parameters"]["partnerCenterPid"]["defaultValue"] == pid.lower()
     # Partner Center needs the literal deployment name, with no condition.
-    (attribution,) = [r for r in packaged["resources"] if r["type"] == "Microsoft.Resources/deployments"]
+    (attribution,) = [
+        r for r in packaged["resources"] if r["type"] == "Microsoft.Resources/deployments"
+    ]
     assert attribution["name"] == f"pid-{pid.lower()}-partnercenter"
     assert "condition" not in attribution
     # The committed template stays without attribution.
