@@ -26,6 +26,14 @@ GB = 1024**3
 # Early-deletion periods per access tier (days), so a recommendation never costs more than it saves.
 MIN_RETENTION = {"cool": 30, "cold": 90, "archive": 180}
 
+LINEAGE_MISSING = (
+    "Lineage is unavailable (reading system.access needs a grant from a Databricks account "
+    "admin), so this verdict rests on storage reads alone."
+)
+DATA_FILES_ONLY = (
+    "Only data files count as reads: Delta writers also read _delta_log, and a query answered "
+    "from Delta statistics alone (for example COUNT(*)) touches no data file."
+)
 LINEAGE_PARTIAL = (
     "Unity Catalog lineage records only the reads it can infer; a table with no lineage event "
     "may still be read in ways lineage does not capture (for example plain JDBC or tools "
@@ -47,6 +55,10 @@ def _norm(path: str) -> str:
     return f"{scheme.lower()}://{host.lower()}{slash}{tail}".rstrip("/")
 
 
+def _is_log(url: str) -> bool:
+    return "/_delta_log/" in url
+
+
 def _gb(size: int) -> str:
     return f"{size / GB:,.2f} GB"
 
@@ -65,8 +77,13 @@ class _Group:
         return sum(b.size for b in self.blobs)
 
     def last_access(self) -> datetime | None:
-        values = [_utc(b.last_access) for b in self.blobs if b.last_access]
+        """Last read of a data file. Delta writers also read `_delta_log`, so log files would
+        make a table that is only written look read."""
+        values = [_utc(b.last_access) for b in self.blobs if b.last_access and not _is_log(b.url)]
         return max(values) if values else None
+
+    def has_delta_log(self) -> bool:
+        return any(_is_log(b.url) for b in self.blobs)
 
     def last_modified(self) -> datetime | None:
         values = [_utc(b.last_modified) for b in self.blobs if b.last_modified]
@@ -155,6 +172,14 @@ class Analyzer:
     # --- signals ------------------------------------------------------------------------
 
     def _global_notes(self) -> None:
+        if not self.snapshot.activity.lineage_available:
+            self.notes.append(
+                "Storage-only mode: lineage, jobs and pipelines are unavailable because the "
+                "identity cannot read system.access (that grant needs a Databricks account "
+                "admin). Findings rest on ADLS last access times, none is above medium "
+                "confidence, and storage without last access evidence is not judged."
+            )
+            return
         earliest = _utc(self.snapshot.activity.earliest_event)
         if self.window_days > LINEAGE_HISTORY_DAYS:
             self.notes.append(
@@ -205,6 +230,8 @@ class Analyzer:
                 "storage reads cannot confirm or refute the lineage signal."
             )
             return evidence, "unknown"
+        if group.has_delta_log():
+            notes.append(DATA_FILES_ONLY)
         last = group.last_access()
         if last and last >= self.cutoff:
             evidence.append(
@@ -245,8 +272,9 @@ class Analyzer:
         if created and created > self.cutoff:
             return []
         activity = self.snapshot.activity
-        last_read = self._last_read(table.full_name)
-        if table.storage_path:
+        lineage = activity.lineage_available
+        last_read = self._last_read(table.full_name) if lineage else None
+        if lineage and table.storage_path:
             location = _norm(table.storage_path)
             path_hits = [t for p, t in path_reads.items() if t and _under(p, location)]
             if path_hits:
@@ -255,19 +283,23 @@ class Analyzer:
         if last_read and last_read >= self.cutoff:
             return []
 
-        notes = [LINEAGE_PARTIAL]
-        evidence = [
-            Evidence(
-                source=LINEAGE,
-                signal=(
-                    f"no read inside the {self.window_days}-day window; last read "
-                    f"{last_read.date().isoformat()}"
-                    if last_read
-                    else "no read recorded in the lineage history"
-                ),
-                observed_at=last_read,
-            )
-        ]
+        notes = [LINEAGE_PARTIAL] if lineage else [LINEAGE_MISSING]
+        evidence = (
+            [
+                Evidence(
+                    source=LINEAGE,
+                    signal=(
+                        f"no read inside the {self.window_days}-day window; last read "
+                        f"{last_read.date().isoformat()}"
+                        if last_read
+                        else "no read recorded in the lineage history"
+                    ),
+                    observed_at=last_read,
+                )
+            ]
+            if lineage
+            else []
+        )
         last_write = _utc(activity.table_writes.get(table.full_name))
         if last_write:
             evidence.append(
@@ -276,10 +308,10 @@ class Analyzer:
                 )
             )
         storage_evidence, storage_verdict = self._storage_evidence(group, notes)
-        if storage_verdict == "read":
+        if storage_verdict == "read" or (not lineage and storage_verdict != "silent"):
             return []
         evidence.extend(storage_evidence)
-        confidence = "high" if storage_verdict == "silent" else "medium"
+        confidence = "high" if lineage and storage_verdict == "silent" else "medium"
         cost, currency = self._cost(group)
         if group.blobs and cost is None:
             notes.append("No storage rates configured for every tier, so no cost estimate.")
@@ -377,23 +409,30 @@ class Analyzer:
         last_path_read = max(hits) if hits else None
         if last_path_read and last_path_read >= self.cutoff:
             return None
+        lineage = self.snapshot.activity.lineage_available
         notes = [
             "No Unity Catalog table owns this storage, so readers outside Databricks are invisible "
             "to lineage."
+            if lineage
+            else LINEAGE_MISSING
         ]
-        evidence = [
-            Evidence(
-                source=LINEAGE,
-                signal=(
-                    f"no path read inside the window; last path read {last_path_read.date().isoformat()}"
-                    if last_path_read
-                    else "no path read recorded in the lineage history"
-                ),
-                observed_at=last_path_read,
-            )
-        ]
+        evidence = (
+            [
+                Evidence(
+                    source=LINEAGE,
+                    signal=(
+                        f"no path read inside the window; last path read {last_path_read.date().isoformat()}"
+                        if last_path_read
+                        else "no path read recorded in the lineage history"
+                    ),
+                    observed_at=last_path_read,
+                )
+            ]
+            if lineage
+            else []
+        )
         storage_evidence, verdict = self._storage_evidence(group, notes)
-        if verdict == "read":
+        if verdict == "read" or (not lineage and verdict != "silent"):
             return None
         evidence.extend(storage_evidence)
         cost, currency = self._cost(group)

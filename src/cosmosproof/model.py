@@ -53,6 +53,7 @@ class Report(BaseModel):
     window_days: int
     findings: list[Finding]
     coverage_notes: list[str] = []
+    storage_files: int = Field(0, description="Files read from inventories or listings.")
 
     def totals(self) -> dict[str, Any]:
         by_reading: dict[str, int] = {"cost": 0, "risk": 0, "compliance": 0}

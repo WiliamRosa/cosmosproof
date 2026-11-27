@@ -52,6 +52,13 @@ class StorageConfig(BaseModel):
         None,
         description="Path to a Blob Inventory report file (CSV or Parquet) for this container.",
     )
+    list_directly: bool = Field(
+        False,
+        description=(
+            "List the container with the Azure SDK instead of reading an inventory report "
+            "(needs the `azure` extra and Storage Blob Data Reader)."
+        ),
+    )
     access_tracking_since: date | None = Field(
         None,
         description=(

@@ -22,6 +22,7 @@ storage:
   - account: mydatalake
     container: lake
     inventory: inventory/lake-2026-11-26.csv   # Blob Inventory report for this container
+    # list_directly: true                     # or list it now (pip install "cosmosproof[azure]")
     access_tracking_since: 2026-01-15          # when last access tracking was enabled; omit if off
 
 # Your own prices per GB-month for each access tier. Without them, no cost is estimated.

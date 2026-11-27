@@ -141,5 +141,51 @@ def test_missing_system_table_grants_give_a_clear_error():
             raise ConnectorError("[INSUFFICIENT_PERMISSIONS] no USE SCHEMA on system.access")
 
     config = ScanConfig(databricks=DatabricksConfig(source={"type": "duckdb"}))
-    with pytest.raises(ScanError, match="account admin"):
+    with pytest.raises(ScanError, match="BROWSE"):
         run_scan(config, connector=Denied(DataSourceConfig(type="duckdb")))
+
+
+def test_storage_only_mode_when_lineage_is_denied(duck, tmp_path):
+    from cosmos_semantic.connectors import Connector, DataSourceConfig
+    from cosmos_semantic.errors import ConnectorError
+
+    class LineageDenied(Connector):
+        def _run(self, sql, fetch_limit):
+            if "uc_lineage" in sql:
+                raise ConnectorError("[INSUFFICIENT_PERMISSIONS] no USE SCHEMA on system.access")
+            return duck._run(sql, fetch_limit)
+
+    inv = tmp_path / "inv.csv"
+    inv.write_text(
+        "Name,Content-Length,AccessTier,Last-Modified,LastAccessTime\n"
+        "raw/clientes/p.parquet,1073741824,Hot,2025-01-01T00:00:00Z,2026-01-11T00:00:00Z\n"
+        # A writer reading the log must not make the table look read.
+        "raw/clientes/_delta_log/00001.json,10,Hot,2026-11-25T00:00:00Z,2026-11-25T00:00:00Z\n"
+        "silver/contas/p.parquet,1073741824,Hot,2026-11-24T00:00:00Z,2026-11-25T00:00:00Z\n",
+        encoding="utf-8",
+    )
+    config = ScanConfig(
+        reference_date=REFERENCE,
+        databricks=DatabricksConfig(source={"type": "duckdb"}, system_tables=NAMES),
+        storage=[
+            StorageConfig(
+                account="acct",
+                container="lake",
+                inventory=str(inv),
+                access_tracking_since="2025-01-01",
+            )
+        ],
+    )
+    report = run_scan(config, connector=LineageDenied(DataSourceConfig(type="duckdb")))
+    kinds = {(f.kind, f.asset) for f in report.findings}
+    assert kinds == {
+        ("unused_table", "main.raw.clientes"),
+        ("unused_personal_data", "main.raw.clientes"),
+    }
+    assert all(f.confidence == "medium" for f in report.findings)
+    assert all(
+        not any(e.source.startswith("system.access") for e in f.evidence) for f in report.findings
+    )
+    assert any("Storage-only mode" in n for n in report.coverage_notes)
+    clientes = next(f for f in report.findings if f.kind == "unused_table")
+    assert any("Only data files count" in n for n in clientes.coverage_notes)

@@ -49,8 +49,9 @@ cosmosproof scan -c cosmosproof.yml -o report.json -m report.md
 
 See [examples/cosmosproof.yml](examples/cosmosproof.yml). You need:
 
-- A Databricks SQL warehouse and a principal with `USE` and `SELECT` on the `system` schemas (`access`, `information_schema`, and for jobs and pipelines `lakeflow` and `billing`).
-- Optionally, one [Blob Inventory](https://learn.microsoft.com/en-us/azure/storage/blobs/blob-inventory) report per ADLS container, with `LastAccessTime`, `AccessTier` and `Content-Length`. Without it, findings stay at medium confidence and have no size or cost.
+- A Databricks SQL warehouse and a principal with `BROWSE` on the catalogs to scan. For lineage, jobs and cost, also `USE` and `SELECT` on the `system` schemas `access`, `lakeflow` and `billing`; only a Databricks account admin can grant those. Without them CosmosProof runs in [storage-only mode](docs/decisions/0006-storage-only-mode.md).
+- Storage Blob Data Reader on each ADLS account. Either list it directly (`list_directly: true`, `pip install "cosmosproof[azure]"`) or point to a Blob Inventory report.
+- For large lakes, one [Blob Inventory](https://learn.microsoft.com/en-us/azure/storage/blobs/blob-inventory) report per ADLS container instead of listing, with `LastAccessTime`, `AccessTier` and `Content-Length`. Without storage data, findings stay at medium confidence and have no size or cost.
 - Optionally, [last access time tracking](https://learn.microsoft.com/en-us/azure/storage/blobs/access-tiers-overview) enabled on the storage account. It only records from activation onwards; the Unity Catalog history (about one year) covers the past.
 
 To prepare those grants, `cosmosproof grants` prints every SQL grant and Azure CLI command (read-only roles only) for a person to review and run:

@@ -162,6 +162,7 @@ def demo_report(window_days: int = 180) -> Report:
         reference_date=REFERENCE,
         window_days=window_days,
         findings=findings,
+        storage_files=sum(len(blobs) for _, blobs in storages),
         coverage_notes=[
             *analyzer.notes,
             "Demo data: a fictional bank lake with illustrative prices.",
