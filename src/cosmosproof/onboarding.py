@@ -85,6 +85,7 @@ def azure_commands(
     accounts: list[StorageAccount],
     container: str,
     policy_file: str = "cosmosproof-inventory-policy.json",
+    log_analytics: str | None = None,
 ) -> str:
     lines = [
         "# Run with the Azure CLI as someone who can assign roles on these storage accounts.",
@@ -113,6 +114,22 @@ def azure_commands(
             f"az storage account blob-inventory-policy create --account-name {acc.name} "
             f"--resource-group {acc.resource_group} --policy @{policy_file}",
         ]
+        if log_analytics:
+            lines += [
+                "# Optional: every blob read as an event in Log Analytics (exact times, any "
+                "reader). Ingestion has a cost.",
+                f"az monitor diagnostic-settings create --name cosmosproof-reads "
+                f"--resource {scope}/blobServices/default --workspace {log_analytics} "
+                """--logs '[{"category":"StorageRead","enabled":true}]'""",
+            ]
+    if log_analytics:
+        lines += [
+            "",
+            "# Read access to the read logs.",
+            f"az role assignment create --assignee-object-id {object_id} "
+            f'--assignee-principal-type ServicePrincipal --role "Log Analytics Reader" '
+            f"--scope {log_analytics}",
+        ]
     return "\n".join(lines)
 
 
@@ -125,6 +142,7 @@ def onboarding_script(
     catalogs: list[str],
     container: str = "cosmosproof-inventory",
     schedule: str = "weekly",
+    log_analytics: str | None = None,
 ) -> str:
     policy = json.dumps(inventory_policy(container, schedule), indent=2)
     return "\n".join(
@@ -138,7 +156,9 @@ def onboarding_script(
             "",
             "## 2. Azure storage (shell)",
             "",
-            azure_commands(object_id, subscription, accounts, container),
+            azure_commands(
+                object_id, subscription, accounts, container, log_analytics=log_analytics
+            ),
             "",
             "## 3. Inventory policy (save as cosmosproof-inventory-policy.json)",
             "",

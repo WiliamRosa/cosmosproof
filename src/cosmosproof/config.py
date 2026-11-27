@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import yaml
@@ -41,6 +41,15 @@ class DatabricksConfig(BaseModel):
     )
 
 
+class AccessLogs(BaseModel):
+    """Azure Storage resource logs (category StorageRead) sent to a Log Analytics workspace."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    workspace_id: str = Field(description="Log Analytics workspace ID (customer ID).")
+    since: datetime = Field(description="When read logging was enabled for the account.")
+
+
 class StorageConfig(BaseModel):
     """One ADLS Gen2 container and its Blob Inventory report."""
 
@@ -58,6 +67,10 @@ class StorageConfig(BaseModel):
             "List the container with the Azure SDK instead of reading an inventory report "
             "(needs the `azure` extra and Storage Blob Data Reader)."
         ),
+    )
+    access_logs: AccessLogs | None = Field(
+        None,
+        description="Read events from storage resource logs: exact times, no one-day granularity.",
     )
     access_tracking_since: date | None = Field(
         None,
@@ -82,6 +95,14 @@ class ScanConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     window_days: int = Field(180, ge=1, description="No read in this many days means unused.")
+    window_hours: float | None = Field(
+        None,
+        gt=0,
+        description=(
+            "A window in hours ending now, instead of window_days. Needs storage read logs: "
+            "last access time only has a one-day granularity."
+        ),
+    )
     reference_date: date | None = None
     orphan_depth: int = Field(
         2, ge=1, description="Directory depth used to group storage not owned by any table."

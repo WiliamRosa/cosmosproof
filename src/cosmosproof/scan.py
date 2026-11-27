@@ -96,6 +96,17 @@ def run_scan(
                 raise
         else:
             blobs = []
+        if storage.access_logs and blobs:
+            from cosmosproof.storage_logs import read_logs
+
+            reads = read_logs(
+                storage.access_logs.workspace_id,
+                storage.account,
+                storage.container,
+                storage.access_logs.since,
+            )
+            for blob in blobs:
+                blob.log_read = reads.get(blob.url)
         storages.append((storage, blobs))
     analyzer = Analyzer(
         snapshot,
@@ -106,6 +117,7 @@ def run_scan(
         orphan_depth=config.orphan_depth,
         producers=producers,
         price_discount=config.databricks.list_price_discount,
+        window_hours=config.window_hours,
     )
     findings = analyzer.run()
     notes = [*analyzer.notes, *producer_notes]
@@ -117,7 +129,7 @@ def run_scan(
         tool_version=__version__,
         generated_at=datetime.now(UTC),
         reference_date=reference,
-        window_days=config.window_days,
+        window_days=analyzer.window_days,
         findings=findings,
         coverage_notes=notes,
         storage_files=sum(len(blobs) for _, blobs in storages),

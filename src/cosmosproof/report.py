@@ -28,10 +28,15 @@ def _size(n: int) -> str:
 
 def to_markdown(report: Report) -> str:
     totals = report.totals()
+    window = (
+        f"{report.window_days * 24:g} hours"
+        if report.window_days < 1
+        else f"{report.window_days:g} days"
+    )
     lines = [
         "# CosmosProof report",
         "",
-        f"Reference date: {report.reference_date.isoformat()} · window: {report.window_days} days · "
+        f"Reference date: {report.reference_date.isoformat()} · window: {window} · "
         f"generated {report.generated_at.isoformat(timespec='seconds')} · CosmosProof {report.tool_version}",
         "",
         "## Summary",

@@ -116,6 +116,11 @@ def grants(
     catalog: list[str] = typer.Option([], "--catalog", help="Catalog to scan; repeat."),
     container: str = typer.Option("cosmosproof-inventory", help="Container for inventory reports."),
     schedule: str = typer.Option("weekly", help="Inventory schedule: daily or weekly."),
+    log_analytics: str | None = typer.Option(
+        None,
+        "--log-analytics",
+        help="Resource ID of a Log Analytics workspace to receive storage read logs (optional).",
+    ),
 ) -> None:
     """Print the grants and setup commands for a person to review and run."""
     from cosmosproof.onboarding import StorageAccount, onboarding_script
@@ -135,6 +140,7 @@ def grants(
             catalogs=catalog,
             container=container,
             schedule=schedule,
+            log_analytics=log_analytics,
         )
     )
 

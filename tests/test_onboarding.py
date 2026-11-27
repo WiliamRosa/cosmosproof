@@ -105,3 +105,25 @@ def test_lab_sql_splits_into_statements():
     assert sum(st.startswith("DROP TABLE") for st in setup) == 2
     consumer = module.statements((lab / "consumer.sql").read_text(encoding="utf-8"))
     assert consumer[0] == "SET use_cached_result = false"
+
+
+def test_grants_with_read_logs():
+    result = runner.invoke(
+        app,
+        [
+            "grants",
+            "--application-id",
+            "a",
+            "--object-id",
+            "o",
+            "--subscription",
+            "s",
+            "--storage",
+            "rg/lake01",
+            "--log-analytics",
+            "/subscriptions/s/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/logs",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "az monitor diagnostic-settings create --name cosmosproof-reads" in result.output
+    assert "StorageRead" in result.output and '"Log Analytics Reader"' in result.output
