@@ -1,0 +1,10 @@
+command: ["streamlit", "run", "app.py"]
+env:
+  # UC volume over the CosmosProof audit location (cosmosproof.audit, selection.json)
+  - name: COSMOSPROOF_VOLUME
+    value: "/Volumes/cosmosproof/audit/files"
+  # CosmosProof's managed identity, from the Marketplace deployment outputs
+  - name: COSMOSPROOF_IDENTITY_APP_ID
+    value: ""
+  - name: COSMOSPROOF_IDENTITY_OBJECT_ID
+    value: ""
