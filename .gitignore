@@ -12,3 +12,4 @@ report*.md
 cosmosproof-ledger.jsonl
 demo.md
 inventory/
+deploy/azure/marketplace/cosmosproof-managed-app.zip
