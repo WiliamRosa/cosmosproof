@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 
 Reading = Literal["cost", "risk", "compliance"]
 Confidence = Literal["high", "medium", "low"]
-Kind = Literal["unused_table", "orphan_path", "unused_personal_data", "unused_producer"]
+Kind = Literal[
+    "unused_table", "orphan_path", "unused_personal_data", "unused_producer", "unused_connection"
+]
 
 
 class Evidence(BaseModel):

@@ -33,6 +33,9 @@ class DatabricksConfig(BaseModel):
     producers: bool = Field(
         True, description="Analyze jobs and pipelines that feed tables nobody reads (phase 2)."
     )
+    federation: bool = Field(
+        True, description="Analyze Lakehouse Federation connections nobody uses (risk reading)."
+    )
     list_price_discount: float = Field(
         0.0,
         ge=0,

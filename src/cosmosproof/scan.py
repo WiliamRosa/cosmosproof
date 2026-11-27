@@ -10,6 +10,7 @@ from cosmos_semantic.errors import ConnectorError
 from cosmosproof import __version__
 from cosmosproof.analyzer import Analyzer
 from cosmosproof.config import ScanConfig
+from cosmosproof.federation import FederationSnapshot
 from cosmosproof.inventory import read_inventory
 from cosmosproof.model import Report
 from cosmosproof.producers import ProducerActivity, read_producers
@@ -40,6 +41,26 @@ def _with_azure_token(source):
     return source.model_copy(update={"options": options})
 
 
+def _read_federation(source) -> tuple[FederationSnapshot | None, str | None]:
+    """Connections come from the REST API, so they need the workspace host and a token."""
+    host = source.options.get("server_hostname")
+    token = source.options.get("access_token")
+    if source.type != "databricks" or not host or not token:
+        return None, "Federation connections were not read: they need server_hostname and a token."
+    try:
+        from cosmosproof.federation import read_federation
+
+        snapshot = read_federation(host, token)
+    except Exception as exc:  # optional reading; never block the scan
+        return None, f"Federation connections were not read ({type(exc).__name__})."
+    if not snapshot.connections:
+        snapshot.notes.append(
+            "No federation connection is visible. The identity only sees connections it has a "
+            "privilege on, so this does not prove there are none."
+        )
+    return snapshot, " ".join(snapshot.notes) or None
+
+
 class ScanError(Exception):
     """A scan cannot start; the message says what to do."""
 
@@ -53,10 +74,12 @@ def run_scan(
     reference = config.reference_date or date.today()
     if config.databricks is None:
         raise ScanError("the configuration needs a `databricks` section")
-    con = connector or connect(_with_azure_token(config.databricks.source))
+    source = _with_azure_token(config.databricks.source)
+    con = connector or connect(source)
     names = config.databricks.system_tables
     producer_notes: list[str] = []
     producers: ProducerActivity | None = None
+    federation: FederationSnapshot | None = None
     try:
         try:
             snapshot: CatalogSnapshot = read_catalog(con, names, reference)
@@ -64,6 +87,10 @@ def run_scan(
             if is_permission_error(exc):
                 raise ScanError(MISSING_GRANTS) from exc
             raise
+        if config.databricks.federation:
+            federation, note = _read_federation(source)
+            if note:
+                producer_notes.append(note)
         if config.databricks.producers and snapshot.activity.lineage_available:
             try:
                 producers = read_producers(con, names, reference, config.window_days)
@@ -117,6 +144,7 @@ def run_scan(
         rates=config.rates,
         orphan_depth=config.orphan_depth,
         producers=producers,
+        federation=federation,
         price_discount=config.databricks.list_price_discount,
         window_hours=config.window_hours,
     )

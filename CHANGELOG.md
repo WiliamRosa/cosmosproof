@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Risk reading: unused Lakehouse Federation connections (`unused_connection`), with ingestion pipelines that use a connection excluded.
 - Azure Marketplace Managed Application package (`deploy/azure/marketplace`), with certification checks as tests.
 - Storage read logs (`access_logs`) as a second storage signal with exact times; `window_hours`; `grants --log-analytics`.
 - Continuous monitoring: `publish:` writes runs, findings with status (new, ongoing, resolved) and run summaries; `options.auth: azure` for Databricks; config from `COSMOSPROOF_CONFIG`; Dockerfile; Container Apps Job template with Log Analytics; Databricks dashboard script.

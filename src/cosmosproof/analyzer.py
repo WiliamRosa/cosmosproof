@@ -14,6 +14,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from cosmos_semantic.bootstrap import _sensitivity
 
 from cosmosproof.config import Rates, StorageConfig
+from cosmosproof.federation import FederationSnapshot
 from cosmosproof.inventory import Blob, container_url
 from cosmosproof.model import Evidence, Finding, finding_id
 from cosmosproof.producers import ProducerActivity
@@ -117,6 +118,7 @@ class Analyzer:
         rates: Rates | None = None,
         orphan_depth: int = 2,
         producers: ProducerActivity | None = None,
+        federation: FederationSnapshot | None = None,
         price_discount: float = 0.0,
         window_hours: float | None = None,
         now: datetime | None = None,
@@ -128,6 +130,7 @@ class Analyzer:
         self.rates = rates
         self.orphan_depth = orphan_depth
         self.producers = producers
+        self.federation = federation
         self.price_discount = price_discount
         self.window_hours = window_hours
         if window_hours:
@@ -164,6 +167,8 @@ class Analyzer:
                 findings.append(orphan)
         if self.producers is not None:
             findings.extend(self._producer_findings())
+        if self.federation is not None:
+            findings.extend(self._connection_findings())
         findings.sort(key=lambda f: (-(f.monthly_cost or 0), -f.size_bytes, f.asset))
         return [f.seal() for f in findings]
 
@@ -591,6 +596,86 @@ class Analyzer:
             for key, tables in self.producers.writes.items()
             if (last := _utc(tables.get(table))) and last >= self.cutoff
         )
+
+    def _connection_findings(self) -> list[Finding]:
+        assert self.federation is not None
+        if not self.snapshot.activity.lineage_available:
+            self.notes.append(
+                "Federation connections were not judged: queries on foreign catalogs read no "
+                "lake storage, so without lineage their use cannot be seen."
+            )
+            return []
+        findings: list[Finding] = []
+        reads = {name: _utc(t) for name, t in self.snapshot.activity.table_reads.items() if t}
+        for conn in self.federation.connections:
+            created = _utc(conn.created)
+            if created and created > self.cutoff:
+                continue
+            if conn.pipelines:
+                continue  # an ingestion pipeline uses it; the producer reading judges that
+            if not conn.catalogs and not self.federation.pipelines_checked:
+                continue  # could be used by an ingestion pipeline we could not see
+            hits = [
+                t
+                for name, t in reads.items()
+                if any(name.startswith(f"{c}.") for c in conn.catalogs)
+            ]
+            last = max(hits) if hits else None
+            if last and last >= self.cutoff:
+                continue
+            what = (
+                f"{len(conn.catalogs)} foreign catalog(s): " + ", ".join(conn.catalogs)
+                if conn.catalogs
+                else "no foreign catalog and no ingestion pipeline"
+            )
+            evidence = [
+                Evidence(
+                    source="Unity Catalog connections",
+                    signal=(
+                        f"{conn.connection_type or 'unknown'} connection to "
+                        f"{conn.host or 'an unknown host'} with {conn.credential_type or 'stored'} "
+                        f"credentials; {what}"
+                    ),
+                    observed_at=created,
+                ),
+                Evidence(
+                    source=LINEAGE,
+                    signal=(
+                        f"no read of any table in its catalogs inside the {self._window_label()} "
+                        "window" + (f"; last read {last.date().isoformat()}" if last else "")
+                    ),
+                    observed_at=last,
+                ),
+            ]
+            findings.append(
+                Finding(
+                    id=finding_id("unused_connection", conn.name),
+                    reading="risk",
+                    kind="unused_connection",
+                    asset=f"connection {conn.name}",
+                    owner=conn.owner,
+                    confidence="medium",
+                    evidence=evidence,
+                    coverage_notes=[
+                        LINEAGE_PARTIAL,
+                        "The source database may serve other applications; this only says "
+                        "Databricks does not use this connection.",
+                    ],
+                    recommendation=(
+                        "A connection nobody uses still holds credentials to a production "
+                        "database. Confirm with the owner, then drop it (and its foreign "
+                        "catalogs) or at least rotate its credentials."
+                    ),
+                    details={
+                        "connection_type": conn.connection_type,
+                        "host": conn.host,
+                        "catalogs": conn.catalogs,
+                    },
+                    window_days=self.window_days,
+                    reference_date=self.reference,
+                )
+            )
+        return findings
 
     def _producer_findings(self) -> list[Finding]:
         assert self.producers is not None
