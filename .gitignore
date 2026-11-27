@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+# Scan outputs can hold owner emails and internal table names: never commit them.
+report*.json
+report*.md
+cosmosproof-ledger.jsonl
+demo.md
+inventory/
