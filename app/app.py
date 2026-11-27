@@ -4,16 +4,19 @@ volume, with the app's own identity; no Azure credential lives here."""
 
 from __future__ import annotations
 
+import html
 import io
 import json
 import os
 import tempfile
 from pathlib import Path
 
+import altair as alt
 import duckdb
 import logic
 import pandas as pd
 import streamlit as st
+import ui
 
 VOLUME = os.environ.get("COSMOSPROOF_VOLUME", "")
 LOCAL = os.environ.get("COSMOSPROOF_LOCAL_DIR", "")  # tests and local runs
@@ -79,10 +82,55 @@ def gigabytes(value) -> str:
     return f"{(value or 0) / 1024**3:,.2f} GB"
 
 
+def chart(frame: pd.DataFrame, kind: str, x: str, y: str, theme: str, horizontal=False):
+    t = ui.THEMES[theme]
+    if kind == "line":
+        base = alt.Chart(frame).mark_line(point=True, color=ui.CHART_PALETTE[0], strokeWidth=3)
+        enc = base.encode(x=alt.X(x, title=None), y=alt.Y(y, title=None))
+    else:
+        base = alt.Chart(frame).mark_bar(cornerRadius=6)
+        color = alt.Color(x, legend=None, scale=alt.Scale(range=ui.CHART_PALETTE))
+        if horizontal:
+            enc = base.encode(
+                y=alt.Y(x, sort="-x", title=None), x=alt.X(y, title=None), color=color
+            )
+        else:
+            enc = base.encode(
+                x=alt.X(x, sort="-y", title=None), y=alt.Y(y, title=None), color=color
+            )
+    return (
+        enc.properties(height=260)
+        .configure(background="transparent")
+        .configure_view(strokeWidth=0)
+        .configure_axis(
+            labelColor=t["muted"],
+            titleColor=t["muted"],
+            gridColor=t["border"],
+            domainColor=t["border"],
+        )
+    )
+
+
+def pager(key: str, total: int, labels: dict, sizes=(10, 25, 50)) -> tuple[int, int]:
+    left, right = st.columns(2)
+    size = left.selectbox(labels["per_page"], sizes, key=f"{key}_size")
+    pages = max(1, -(-total // size))
+    number = right.number_input(
+        f"{labels['page']} (1–{pages})", min_value=1, max_value=pages, value=1, key=f"{key}_page"
+    )
+    return int(number), int(size)
+
+
+# --- sidebar and theme ---------------------------------------------------------------------
+
 lang = st.sidebar.radio(
     "Idioma / Language", ["pt", "en"], format_func=lambda c: {"pt": "Português", "en": "English"}[c]
 )
 T = logic.TEXT[lang]
+dark = st.sidebar.toggle(T["dark_mode"], key="dark_mode")
+theme = "dark" if dark else "light"
+st.markdown(ui.css(theme), unsafe_allow_html=True)
+
 st.title(T["title"])
 st.caption(T["tagline"])
 
@@ -90,6 +138,8 @@ data, resource_rows = load_store(LOCAL or VOLUME)
 tab_overview, tab_resources, tab_connections = st.tabs(
     [T["tab_overview"], T["tab_resources"], T["tab_connections"]]
 )
+
+# --- overview ------------------------------------------------------------------------------
 
 with tab_overview:
     if not data.get("run"):
@@ -113,107 +163,179 @@ with tab_overview:
         with left:
             st.subheader(T["by_reading"])
             if data["by_reading"]:
-                st.bar_chart(pd.DataFrame(data["by_reading"]), x="reading", y="findings")
+                frame = pd.DataFrame(data["by_reading"])
+                frame["reading"] = frame["reading"].map(lambda r: T.get(f"reading_{r}", r))
+                st.altair_chart(chart(frame, "bar", "reading", "findings", theme), theme=None)
         with middle:
             st.subheader(T["by_owner"])
             owners = pd.DataFrame(data["by_owner"]).fillna({"monthly_cost": 0})
             if not owners.empty:
-                st.bar_chart(owners, x="owner", y="monthly_cost", horizontal=True)
+                st.altair_chart(
+                    chart(owners, "bar", "owner", "monthly_cost", theme, horizontal=True),
+                    theme=None,
+                )
         with right:
             st.subheader(T["trend"])
             trend = pd.DataFrame(data["trend"])
             if not trend.empty:
-                st.line_chart(trend, x="started_at", y="open_findings")
+                st.altair_chart(
+                    chart(trend, "line", "started_at", "open_findings", theme), theme=None
+                )
 
         st.subheader(T["findings"])
-        findings = pd.DataFrame(data["findings"])
-        f1, f2 = st.columns(2)
-        readings = f1.multiselect(T["filter_reading"], sorted(findings["reading"].unique()))
-        names = f2.multiselect(
-            T["filter_resource"], sorted(findings["resource_name"].dropna().unique())
+        findings = data["findings"]
+        f1, f2, f3 = st.columns(3)
+        readings = f1.multiselect(
+            T["filter_reading"],
+            sorted({f["reading"] for f in findings}),
+            format_func=lambda r: T.get(f"reading_{r}", r),
         )
-        if readings:
-            findings = findings[findings["reading"].isin(readings)]
-        if names:
-            findings = findings[findings["resource_name"].isin(names)]
-        for _, f in findings.iterrows():
-            cost = (
-                f" · {money(f['monthly_cost'], f['currency'])}"
-                if pd.notna(f["monthly_cost"])
-                else ""
-            )
-            title = (
-                f"**{f['asset']}** · {f['kind']} · {f['confidence']} · {f['owner'] or '—'}{cost}"
-            )
-            with st.expander(title):
-                st.markdown(f"**{T['recommendation']}:** {f['recommendation']}")
-                st.markdown(f"**{T['evidence']}:**")
-                for e in logic.parse_json(f["evidence"]):
-                    when = f" ({e['observed_at'][:10]})" if e.get("observed_at") else ""
-                    st.markdown(f"- {e['source']}: {e['signal']}{when}")
-                notes = logic.parse_json(f["coverage_notes"])
-                if notes:
-                    st.markdown(f"**{T['not_seen']}:**")
-                    for n in notes:
-                        st.markdown(f"- {n}")
-                st.code(f"{T['proof']}: {f['proof_hash']}", language=None)
+        groups = f2.multiselect(
+            T["resource_group"], sorted({f["resource_group"] or "—" for f in findings})
+        )
+        names = f3.multiselect(
+            T["filter_resource"], sorted({f["resource_name"] or "—" for f in findings})
+        )
+        shown = [
+            f
+            for f in findings
+            if (not readings or f["reading"] in readings)
+            and (not groups or (f["resource_group"] or "—") in groups)
+            and (not names or (f["resource_name"] or "—") in names)
+        ]
+        st.markdown(
+            f'<div class="cp-muted">{T["legend"]}</div>'
+            + ui.legend(sorted({f["resource_group"] or "" for f in shown})),
+            unsafe_allow_html=True,
+        )
+        number, size = pager("findings", len(shown), T)
+        items, pages = ui.page(shown, number, size)
+        st.markdown(
+            "".join(
+                ui.finding_card(
+                    f,
+                    T,
+                    theme,
+                    logic.parse_json(f["evidence"]),
+                    logic.parse_json(f["coverage_notes"]),
+                )
+                for f in items
+            ),
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="cp-muted">'
+            + T["showing"].format(n=len(items), total=len(shown), page=number, pages=pages)
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+
+# --- resources -----------------------------------------------------------------------------
 
 with tab_resources:
     st.write(T["resources_help"])
     if resource_rows:
-        frame = pd.DataFrame(resource_rows)
-        if st.button(T["leave_out_nonprod"]):
-            choices = logic.leave_out_nonproduction(resource_rows)
-            frame["selected"] = frame["resource_id"].map(choices)
-            st.session_state["pending"] = choices
-        frame["kind"] = frame["kind"].map({"workspace": T["workspace"], "storage": T["storage"]})
-        edited = st.data_editor(
-            frame[
-                [
-                    "selected",
-                    "name",
-                    "kind",
-                    "environment",
-                    "resource_group",
-                    "managed_by",
-                    "resource_id",
-                ]
-            ],
-            column_config={
-                "selected": st.column_config.CheckboxColumn(T["analyze"]),
-                "name": T["name"],
-                "kind": T["kind"],
-                "environment": T["environment"],
-                "resource_group": T["resource_group"],
-                "managed_by": T["managed_by"],
-                "resource_id": None,
-            },
-            disabled=["name", "kind", "environment", "resource_group", "managed_by"],
-            hide_index=True,
-            width="stretch",
-            key="selection_editor",
+        st.session_state.setdefault(
+            "choices", {r["resource_id"]: bool(r["selected"]) for r in resource_rows}
         )
+
+        def leave_out() -> None:
+            current = st.session_state["choices"]
+            st.session_state["choices"] = logic.leave_out_nonproduction(
+                [
+                    {**r, "selected": current.get(r["resource_id"], r["selected"])}
+                    for r in resource_rows
+                ]
+            )
+            for key in [k for k in st.session_state if str(k).startswith("sel::")]:
+                del st.session_state[key]
+
+        def remember(resource_id: str) -> None:
+            st.session_state["choices"][resource_id] = st.session_state[f"sel::{resource_id}"]
+
+        top_left, top_right = st.columns([3, 1])
+        top_left.button(T["leave_out_nonprod"], on_click=leave_out)
+        selected_count = sum(st.session_state["choices"].values())
+        top_right.markdown(
+            '<div class="cp-muted">'
+            + T["selected_count"].format(n=selected_count, total=len(resource_rows))
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+        ordered = sorted(
+            resource_rows,
+            key=lambda r: (r["subscription"], r["resource_group"], r["kind"], r["name"]),
+        )
+        number, size = pager("resources", len(ordered), T, sizes=(20, 50, 100))
+        items, _ = ui.page(ordered, number, size)
+        current_group = None
+        for r in items:
+            group = r["resource_group"]
+            if group != current_group:
+                current_group = group
+                st.markdown(
+                    f'<div class="cp-muted"><i class="cp-dot" style="background:{ui.color_for(group)}"></i>'
+                    f"{T['resource_group']}: <b>{html.escape(group)}</b> · "
+                    f"{html.escape(r['subscription'])}</div>",
+                    unsafe_allow_html=True,
+                )
+            c1, c2, c3 = st.columns([1, 4, 3])
+            c1.toggle(
+                T["analyze"],
+                value=st.session_state["choices"].get(r["resource_id"], bool(r["selected"])),
+                key=f"sel::{r['resource_id']}",
+                on_change=remember,
+                args=(r["resource_id"],),
+                label_visibility="collapsed",
+            )
+            kind = T["workspace"] if r["kind"] == "workspace" else T["storage"]
+            managed = (
+                f" · {T['managed_by']}: {html.escape(r['managed_by'])}" if r["managed_by"] else ""
+            )
+            c2.markdown(
+                f'<div class="cp-row"><b>{html.escape(r["name"])}</b>'
+                f'<div class="cp-muted">{kind}{managed}</div></div>',
+                unsafe_allow_html=True,
+            )
+            env = r["environment"] or "unknown"
+            c3.markdown(
+                ui.badge(T.get(f"env_{env}", env), ui.ENV_COLORS.get(env, "#dee2e6"))
+                + f'<span class="cp-muted">{T["suggested_by"]}: '
+                f"{html.escape(r['environment_source'] or '—')}</span>",
+                unsafe_allow_html=True,
+            )
         if st.button(T["save"], type="primary"):
             current = json.loads(read_bytes("selection.json") or b"{}")
-            choices = dict(zip(edited["resource_id"], edited["selected"].astype(bool), strict=True))
             write_text(
                 "selection.json",
-                json.dumps(logic.apply_selection(current, choices, user_email()), indent=2),
+                json.dumps(
+                    logic.apply_selection(current, dict(st.session_state["choices"]), user_email()),
+                    indent=2,
+                ),
             )
             st.success(T["saved"])
+
+# --- connections ---------------------------------------------------------------------------
 
 with tab_connections:
     st.write(T["connections_help"])
     health = data.get("health") or []
-    if health:
-        labels = {"ok": T["ready"], "error": T["missing"], None: T["not_scanned"]}
-        table = pd.DataFrame(health)
-        table = table[table["selected"]]
-        table["status"] = table["last_scan_status"].map(lambda s: labels.get(s, s))
-        st.dataframe(
-            table[["name", "kind", "environment", "status", "last_scan_error"]],
-            hide_index=True,
-            width="stretch",
+    chosen = [h for h in health if h["selected"]]
+    if chosen:
+        status_labels = {"ok": T["ready"], "error": T["missing"], None: T["not_scanned"]}
+        rows = [
+            [
+                h["name"],
+                T["workspace"] if h["kind"] == "workspace" else T["storage"],
+                T.get(f"env_{h['environment']}", h["environment"] or "—"),
+                status_labels.get(h["last_scan_status"], h["last_scan_status"]),
+                (h["last_scan_error"] or "")[:160],
+            ]
+            for h in chosen
+        ]
+        st.markdown(
+            ui.table([T["name"], T["kind"], T["environment"], T["status"], T["detail"]], rows),
+            unsafe_allow_html=True,
         )
         st.download_button(
             T["download_script"],

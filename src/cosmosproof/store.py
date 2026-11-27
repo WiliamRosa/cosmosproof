@@ -61,7 +61,7 @@ VIEWS = """
 CREATE OR REPLACE VIEW v_latest_run AS
     SELECT * FROM dim_run ORDER BY started_at DESC LIMIT 1;
 CREATE OR REPLACE VIEW v_open_findings AS
-    SELECT f.*, r.name AS resource_name, r.environment
+    SELECT f.*, r.name AS resource_name, r.environment, r.resource_group
     FROM fact_finding f
     LEFT JOIN dim_resource r USING (resource_id)
     WHERE f.run_id = (SELECT run_id FROM v_latest_run) AND f.status <> 'resolved';

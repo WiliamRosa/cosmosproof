@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 
 HERE = Path(__file__).parent
-FILES = ["app.py", "logic.py", "requirements.txt"]
+FILES = ["app.py", "logic.py", "ui.py", "requirements.txt"]
 NAME = "cosmosproof"
 
 
@@ -62,7 +62,10 @@ def main() -> None:
     existing = {a.name for a in w.apps.list()}
     if NAME not in existing:
         w.apps.create_and_wait(
-            app=App(name=NAME, description="CosmosProof: LakeOps findings, selection and access")
+            app=App(
+                name=NAME,
+                description="CosmosProof: Lakehouse FinOps findings, selection and access",
+            )
         )
     app = w.apps.get(NAME)
     print(f"app service principal: {app.service_principal_client_id}")
