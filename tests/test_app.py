@@ -155,3 +155,10 @@ def test_ui_escapes_and_colors():
     assert ui.color_for("rg-1") == ui.color_for("RG-1")
     assert ui.page(list(range(23)), 3, 10) == ([20, 21, 22], 3)
     assert ui.page([], 5, 10) == ([], 1)
+
+
+def test_badges_keep_black_text_in_both_themes():
+    import ui
+
+    for theme in ("light", "dark"):
+        assert ".stApp span.cp-badge { color: #1f2328 !important; }" in ui.css(theme)
