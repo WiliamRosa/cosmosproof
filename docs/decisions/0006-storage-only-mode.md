@@ -29,5 +29,6 @@ Storage can now be **listed directly** (`list_directly: true`, `azure` extra, St
 
 - Onboarding can start with only Storage Blob Data Reader and `BROWSE`, and add the account admin grants later for lineage, jobs and cost.
 - The window must be longer than last access tracking granularity (one day), otherwise a daily reader can look silent.
+- Queries answered by the Databricks SQL result cache or the disk cache read no storage, so a table that is only ever queried that way looks unused; storage-only findings say so. Lineage does not have this blind spot.
 - Listing is fine for small and medium lakes; inventory reports remain the choice for large ones.
 - Validated live: listing returns size, tier, last modified and last access for an ADLS Gen2 account, and Unity Catalog managed tables live under `managed/__unitystorage/...`, which maps through their storage path like external tables.

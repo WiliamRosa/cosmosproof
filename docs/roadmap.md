@@ -17,6 +17,8 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 - [ ] Join `system.query.history` as a second read signal (the SQL Query History API redacts query text, see ADR 0006)
 - [ ] Validation on an Azure Databricks workspace with ADLS external tables: storage path format confirmed on Azure (2026-11-27); lineage and a real inventory report pending an account admin grant and the first daily inventory run
 
+- [x] Lab with ten scenarios in ADLS + Unity Catalog and two daily jobs ([lab/](../lab/README.md)), deployed on Azure
+
 ## Phase 2: Producers (jobs and pipelines, including Lakeflow Connect) — in progress
 
 - [x] Jobs and pipelines whose outputs nobody reads, with their compute cost at list price ([ADR 0005](decisions/0005-producers-and-compute-cost.md)), validated against a real workspace
