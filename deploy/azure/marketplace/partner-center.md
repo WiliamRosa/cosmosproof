@@ -1,13 +1,13 @@
 # Creating the offer in Partner Center
 
-Step by step for the CosmosProof offer, under the same publisher as Cosmos Semantic (Cosmos Data). The texts to paste are in [listing.md](listing.md); the plans and prices are in [pricing-proposal.md](pricing-proposal.md) (decided).
+Step by step for the CosmosProof offer, under the same publisher as Cosmos Semantic (Cosmos Data). The texts to paste are in [listing.md](listing.md); the plan is in [pricing-proposal.md](pricing-proposal.md): one Free plan, unlimited, production use allowed.
 
 ## Before starting
 
 - [ ] The product page, privacy policy and terms are live: https://cosmosdata.ai/proof/, https://cosmosdata.ai/proof/privacy and https://cosmosdata.ai/proof/terms.
 - [ ] The image `ghcr.io/wiliamrosa/cosmosproof:0.1.0` is public (Container Apps pulls it at deployment time).
-- [ ] The account has a valid **payout and tax profile** (gear icon → Account settings → Payout and tax). Without it, Partner Center refuses to save a paid plan's price ("This account is not publish eligible due to either an invalid payout, payout on hold, or invalid tax"); free plans save normally.
-- [x] Plans and prices decided: Evaluation (free, non-production), Starter US$ 490/month, Business US$ 1,490/month, Enterprise by private offer.
+- [ ] Only for paid plans: the account has a valid **payout and tax profile** (gear icon → Account settings → Payout and tax). Without it, Partner Center refuses to save a paid plan's price ("This account is not publish eligible due to either an invalid payout, payout on hold, or invalid tax"); free plans save normally.
+- [x] Plan decided: one public `free` plan, US$ 0, all markets, no limits.
 
 ## 1. New offer
 
@@ -40,11 +40,11 @@ Add the Azure subscription ID used for tests (the same one used to validate the 
 
 ## 6. Plans
 
-One plan per row of the pricing table, for example plan ID `starter`, then `business` (and `evaluation` if kept public). For each plan:
+One plan, ID `free` (name Free). Plan IDs are permanent: pick one that will still be true later. For each plan:
 
 1. **Plan setup:** type **Managed application**; Azure regions: Azure Global.
-2. **Plan listing:** name and description; for the evaluation plan, state "non-production evaluation, up to 1 workspace, 30 days".
-3. **Pricing and availability:** markets (start with Brazil and United States; add more later), price per month (and per year if offered), visibility public (or private with tenant IDs for the evaluation plan).
+2. **Plan listing:** name and description; state that production use is allowed and that there is no limit on workspaces or resources.
+3. **Pricing and availability:** all markets (Edit markets → Select all), price US$ 0 per month, visibility public.
 4. **Technical configuration:**
    - Version: `0.1.0`.
    - Customer usage attribution ID: Partner Center shows `pid-<GUID>-partnercenter`, where the GUID is the offer's own (the same for every plan; for `cosmosproof` it is `e95b41bb-895b-476c-947d-ce5b759988fc`). Build the package with it:

@@ -8,7 +8,7 @@ or license the rights to the company, or name the licensor in these terms); gove
 
 # CosmosProof terms of use
 
-Last updated: 2026-11-27
+Last updated: 2026-11-28
 
 ## What you are getting
 
@@ -16,7 +16,7 @@ The CosmosProof offer on the Azure Marketplace ("the Offer") deploys CosmosProof
 
 ## License
 
-CosmosProof is source-available under the Business Source License 1.1, published at https://github.com/WiliamRosa/cosmosproof/blob/main/LICENSE. That license allows production use only for non-commercial purposes. **An active subscription to a paid plan of the Offer is the commercial license** that allows your organization to use CosmosProof in production on its own data, for as long as the subscription is active and within the scope of the plan you chose.
+CosmosProof is source-available under the Business Source License 1.1, published at https://github.com/WiliamRosa/cosmosproof/blob/main/LICENSE. That license allows production use only for non-commercial purposes. **An active subscription to the Offer is the commercial license** that allows your organization to use CosmosProof in production on its own data, for as long as the subscription is active. The Offer currently has one plan, **Free**: no charge and no limit on the number of workspaces, storage accounts, subscriptions or users. If paid plans are introduced later, they will be announced as described under "Changes", and existing Free subscriptions keep their license.
 
 These terms do not reduce any right the Business Source License already gives you, including evaluation and other non-production use.
 
@@ -37,19 +37,19 @@ See the privacy policy at https://cosmosdata.ai/proof/privacy.
 
 ## Support and updates
 
-Support is given by e-mail and through the contact form at https://cosmosdata.ai/proof/#contact, on business days, with no response time guarantee unless your plan states one. New versions are announced in the GitHub repository's releases.
+Support is given by e-mail and through the contact form at https://cosmosdata.ai/proof/#contact, on business days, on a best-effort basis with no response time guarantee. New versions are announced in the GitHub repository's releases.
 
 ## Warranty and liability
 
-CosmosProof is provided "as is", without warranty of any kind, as stated in its license. To the extent permitted by law, the Publisher's total liability under the Offer is limited to the amount you paid for the Offer in the twelve months before the claim.
+CosmosProof is provided "as is", without warranty of any kind, as stated in its license. To the extent permitted by law, the Publisher's total liability under the Offer is limited to the amount you paid for the Offer in the twelve months before the claim (nothing, while the Offer is free).
 
 ## Ending the subscription
 
-Cancelling the Marketplace subscription ends the commercial license and the support. The resources in your subscription stay there until you delete them; deleting the Managed Application removes everything the deployment created.
+Cancelling the Marketplace subscription ends the commercial license. The resources in your subscription stay there until you delete them; deleting the Managed Application removes everything the deployment created.
 
 ## Changes
 
-Changes to these terms or to the Offer's plans are published at this same address, with the date above updated, and do not apply retroactively to a period already paid.
+Changes to these terms or to the Offer's plans are published at this same address, with the date above updated, and do not apply retroactively.
 
 ## Contact
 

@@ -1,6 +1,8 @@
 # Pricing
 
-**Decided on 2026-11-27: option A with the prices below** (Evaluation, Starter, Business, Enterprise by private offer). The reasoning is kept as written. It had to fit two facts:
+**Current decision (2026-11-28): one Free plan, unlimited and with production use allowed.** The Marketplace offer has a single public plan, `free`, at US$ 0 in every market, with no limit on workspaces, storage accounts or subscriptions. Subscribing to it is the commercial license the BSL asks for (see [terms-of-use.md](terms-of-use.md)), so the license and the offer stay consistent. It also needs no payout and tax profile in Partner Center. Paid plans may come later.
+
+The earlier analysis below (option A, decided on 2026-11-27 and replaced the next day) is kept for when paid plans are reconsidered. It had to fit two facts:
 
 1. **The license.** Under BSL 1.1, production use by a company needs a commercial license, and the LICENSE file names the Marketplace offer as the way to get one. A free plan that a company could run in production forever would contradict the license. So the Marketplace offer must have at least one **paid** plan, and any free plan must be explicitly limited to evaluation.
 2. **The Marketplace model for a Managed Application.** A plan can have a flat monthly (or yearly) price, optionally plus metered dimensions reported by the publisher. Managed Applications have no built-in free trial. Microsoft keeps a 3% store fee.
@@ -20,7 +22,7 @@ The value is in the size of the estate, not in the number of users: the app is f
 | Publisher work | None beyond the plans | The job must report usage to the Marketplace metering API: new code, a publisher identity and a test | None |
 | Fairness | Steps between plans | Fair | Small estates overpay, large ones underpay |
 
-**Decision: A**, with prices to revisit after the first bank interviews:
+**Decided on 2026-11-27, replaced on 2026-11-28 by the Free plan:** A, with these prices:
 
 | Plan | Scope | Monthly | Yearly (2 months free) |
 |---|---|---|---|

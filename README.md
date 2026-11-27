@@ -111,6 +111,6 @@ If storage shows a read inside the window, there is no finding, even when lineag
 
 ## License
 
-CosmosProof is **source-available** under the [Business Source License 1.1](LICENSE), not open source. You can read, modify and use it for evaluation and other non-production purposes, and in production for non-commercial purposes. Production use by a company requires a commercial license, offered through the Azure Marketplace. Each version converts to Apache 2.0 four years after its release. See [ADR 0002](docs/decisions/0002-repository-license-and-cosmos-dependency.md).
+CosmosProof is **source-available** under the [Business Source License 1.1](LICENSE), not open source. You can read, modify and use it for evaluation and other non-production purposes, and in production for non-commercial purposes. Production use by a company requires a commercial license: subscribe to the CosmosProof offer on the Azure Marketplace, which has a free plan with no limits. Each version converts to Apache 2.0 four years after its release. See [ADR 0002](docs/decisions/0002-repository-license-and-cosmos-dependency.md).
 
 CosmosProof builds on [Cosmos Semantic](https://github.com/WiliamRosa/cosmos-semantic-platform) (Apache 2.0).
