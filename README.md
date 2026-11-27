@@ -53,7 +53,13 @@ See [examples/cosmosproof.yml](examples/cosmosproof.yml). You need:
 - Optionally, one [Blob Inventory](https://learn.microsoft.com/en-us/azure/storage/blobs/blob-inventory) report per ADLS container, with `LastAccessTime`, `AccessTier` and `Content-Length`. Without it, findings stay at medium confidence and have no size or cost.
 - Optionally, [last access time tracking](https://learn.microsoft.com/en-us/azure/storage/blobs/access-tiers-overview) enabled on the storage account. It only records from activation onwards; the Unity Catalog history (about one year) covers the past.
 
-CosmosProof only reads. It never deletes, moves or changes anything.
+To prepare those grants, `cosmosproof grants` prints every SQL grant and Azure CLI command (read-only roles only) for a person to review and run:
+
+```bash
+cosmosproof grants --application-id <app-id> --object-id <object-id> \n  --subscription <sub-id> --storage rg-data/lake01 --catalog main
+```
+
+CosmosProof only reads. It never deletes, moves or changes anything, and never runs those commands itself.
 
 ## Keep it running
 

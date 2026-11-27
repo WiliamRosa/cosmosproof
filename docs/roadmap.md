@@ -20,7 +20,7 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 - [x] Jobs and pipelines whose outputs nobody reads, with their compute cost at list price ([ADR 0005](decisions/0005-producers-and-compute-cost.md)), validated against a real workspace
 - [x] Reads by dead producers are not use; chains of dead producers are found to a fixed point
 - [x] Unused tables name the producers that still feed them
-- [ ] Contract discount factor for list prices
+- [x] Contract discount factor for list prices (`databricks.list_price_discount`)
 - [ ] The same source table brought in several times (Lakeflow, JDBC, federation)
 
 ## Phase 3: Federation and database-side statistics
@@ -31,7 +31,8 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 
 ## Phase 4: Delivery
 
-- [ ] Managed Application template and guided grant script ([ADR 0003](decisions/0003-azure-marketplace-managed-application.md))
+- [x] Grant script generator (`cosmosproof grants`): Databricks SQL grants, read-only Azure role, access tracking, inventory policy. Commands checked against the Azure CLI help; not yet run on a real storage account
+- [ ] Managed Application template ([ADR 0003](decisions/0003-azure-marketplace-managed-application.md))
 - [ ] VNet-integrated option for private endpoints
 - [ ] Owner-based showback and alert delivery
 

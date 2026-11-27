@@ -72,6 +72,42 @@ def demo(
     _write(demo_report(window_days), out, markdown)
 
 
+@app.command()
+def grants(
+    application_id: str = typer.Option(
+        ..., help="Application (client) ID of CosmosProof's identity, as added to Databricks."
+    ),
+    object_id: str = typer.Option(..., help="Object (principal) ID of the same identity."),
+    subscription: str = typer.Option(..., help="Azure subscription ID of the storage accounts."),
+    storage: list[str] = typer.Option(
+        [], "--storage", help="<resource-group>/<account>; repeat for each account."
+    ),
+    catalog: list[str] = typer.Option([], "--catalog", help="Catalog to scan; repeat."),
+    container: str = typer.Option("cosmosproof-inventory", help="Container for inventory reports."),
+    schedule: str = typer.Option("weekly", help="Inventory schedule: daily or weekly."),
+) -> None:
+    """Print the grants and setup commands for a person to review and run."""
+    from cosmosproof.onboarding import StorageAccount, onboarding_script
+
+    if schedule not in {"daily", "weekly"}:
+        raise typer.BadParameter("schedule must be daily or weekly")
+    try:
+        accounts = [StorageAccount.parse(s) for s in storage]
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(
+        onboarding_script(
+            application_id=application_id,
+            object_id=object_id,
+            subscription=subscription,
+            accounts=accounts,
+            catalogs=catalog,
+            container=container,
+            schedule=schedule,
+        )
+    )
+
+
 @app.command("diff")
 def diff_cmd(previous: Path, current: Path) -> None:
     """Compare two reports: new findings are alerts, resolved ones go to the ledger."""

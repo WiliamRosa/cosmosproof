@@ -54,6 +54,7 @@ def run_scan(
         rates=config.rates,
         orphan_depth=config.orphan_depth,
         producers=producers,
+        price_discount=config.databricks.list_price_discount,
     )
     findings = analyzer.run()
     notes = [*analyzer.notes, *producer_notes]

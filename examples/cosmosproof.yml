@@ -15,6 +15,8 @@ databricks:
       profile: ${DATABRICKS_PROFILE:-DEFAULT}
       # ... or server_hostname + access_token.
       http_path: ${DATABRICKS_HTTP_PATH}
+  producers: true            # jobs and pipelines that feed tables nobody reads
+  list_price_discount: 0.0   # your contract discount on Databricks list prices, e.g. 0.2
 
 storage:
   - account: mydatalake
