@@ -149,7 +149,11 @@ class Analyzer:
         path_reads = {_norm(p): _utc(t) for p, t in self.snapshot.activity.path_reads.items()}
         self._global_notes()
         for table in self.snapshot.tables:
-            if table.table_type.upper() in {"VIEW", "MATERIALIZED_VIEW", "METRIC_VIEW"}:
+            if table.ignored or table.table_type.upper() in {
+                "VIEW",
+                "MATERIALIZED_VIEW",
+                "METRIC_VIEW",
+            }:
                 continue
             group = table_groups.get(table.full_name, _Group())
             found = self._table_findings(table, group, path_reads)
@@ -174,11 +178,20 @@ class Analyzer:
         orphans: dict[str, _Group] = defaultdict(_Group)
         for storage, blobs in self.storages:
             base = _norm(container_url(storage.account, storage.container))
+            # Orphan Delta tables are grouped by their root (the folder holding _delta_log), so
+            # two dropped tables side by side are judged separately.
+            delta_roots = sorted(
+                {_norm(b.url).split("/_delta_log/", 1)[0] for b in blobs if _is_log(b.url)},
+                key=len,
+                reverse=True,
+            )
             for blob in blobs:
                 url = _norm(blob.url)
                 owner = next((name for loc, name in locations if _under(url, loc)), None)
                 if owner:
                     group = table_groups[owner]
+                elif root := next((r for r in delta_roots if _under(url, r)), None):
+                    group = orphans[root]
                 else:
                     relative = url[len(base) + 1 :].split("/")
                     depth = min(self.orphan_depth, max(len(relative) - 1, 1))
@@ -516,7 +529,7 @@ class Analyzer:
 
     def _recent_outputs(self, key: str) -> dict[str, datetime]:
         assert self.producers is not None
-        known = {t.full_name for t in self.snapshot.tables}
+        known = {t.full_name for t in self.snapshot.tables if not t.ignored}
         return {
             table: last
             for table, raw in self.producers.writes.get(key, {}).items()

@@ -74,7 +74,8 @@ def run_scan(
         if connector is None:
             con.close()
     excluded = set(config.exclude_catalogs)
-    snapshot.tables = [t for t in snapshot.tables if t.full_name.split(".", 1)[0] not in excluded]
+    for table in snapshot.tables:
+        table.ignored = table.full_name.split(".", 1)[0] in excluded
     storages = []
     for storage in config.storage:
         path = (inventories or {}).get((storage.account, storage.container)) or storage.inventory

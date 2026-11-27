@@ -1,0 +1,281 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.49.2.45890",
+      "templateHash": "5524245051005369527"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    },
+    "databricksHost": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure Databricks workspace host, e.g. adb-1234567890123456.7.azuredatabricks.net."
+      }
+    },
+    "warehouseId": {
+      "type": "string",
+      "metadata": {
+        "description": "ID of the SQL warehouse CosmosProof queries."
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "ADLS Gen2 account to scan."
+      }
+    },
+    "storageContainer": {
+      "type": "string",
+      "metadata": {
+        "description": "Container to scan in that account."
+      }
+    },
+    "windowDays": {
+      "type": "int",
+      "defaultValue": 90,
+      "minValue": 1,
+      "maxValue": 395,
+      "metadata": {
+        "description": "No read in this many days means unused."
+      }
+    },
+    "accessTrackingSince": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Date last access time tracking was enabled on the account (yyyy-mm-dd), or empty if it is off."
+      }
+    },
+    "cron": {
+      "type": "string",
+      "defaultValue": "0 6 * * *",
+      "metadata": {
+        "description": "Daily scan time, as a cron expression in UTC."
+      }
+    },
+    "image": {
+      "type": "string",
+      "defaultValue": "ghcr.io/wiliamrosa/cosmosproof:0.1.0",
+      "metadata": {
+        "description": "Scanner image. Fixed by the publisher."
+      }
+    },
+    "partnerCenterPid": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Customer usage attribution ID assigned by Partner Center. Empty outside the Marketplace."
+      }
+    }
+  },
+  "variables": {
+    "suffix": "[uniqueString(resourceGroup().id)]",
+    "reportsAccountName": "[take(format('cpreports{0}', variables('suffix')), 24)]",
+    "reportsContainer": "cosmosproof-reports",
+    "trackingLine": "[if(empty(parameters('accessTrackingSince')), '', format('\n    access_tracking_since: {0}', parameters('accessTrackingSince')))]",
+    "scanConfig": "[format('window_days: {0}\r\ndatabricks:\r\n  source:\r\n    type: databricks\r\n    max_rows: 1000000\r\n    timeout_seconds: 600\r\n    options:\r\n      server_hostname: {1}\r\n      http_path: /sql/1.0/warehouses/{2}\r\n      auth: azure\r\nstorage:\r\n  - account: {3}\r\n    container: {4}\r\n    list_directly: true{5}\r\npublish: abfss://{6}@{7}.dfs.{8}/runs\r\n', parameters('windowDays'), parameters('databricksHost'), parameters('warehouseId'), parameters('storageAccountName'), parameters('storageContainer'), variables('trackingLine'), variables('reportsContainer'), variables('reportsAccountName'), environment().suffixes.storage)]"
+  },
+  "resources": [
+    {
+      "condition": "[not(empty(parameters('partnerCenterPid')))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2021-04-01",
+      "name": "[format('pid-{0}-partnercenter', parameters('partnerCenterPid'))]",
+      "properties": {
+        "mode": "Incremental",
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "resources": []
+        }
+      }
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "cosmosproof-identity",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[format('cosmosproof-logs-{0}', variables('suffix'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('reportsAccountName')]",
+      "location": "[parameters('location')]",
+      "kind": "StorageV2",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "isHnsEnabled": true,
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false,
+        "allowSharedKeyAccess": false,
+        "supportsHttpsTrafficOnly": true
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}', variables('reportsAccountName'), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('reportsAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}/{2}', variables('reportsAccountName'), 'default', variables('reportsContainer'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('reportsAccountName'), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('reportsAccountName'), 'default', variables('reportsContainer'))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('reportsAccountName'), 'default', variables('reportsContainer')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), 'Storage Blob Data Contributor')]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity')]",
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('reportsAccountName'), 'default', variables('reportsContainer'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2024-03-01",
+      "name": "cosmosproof-env",
+      "location": "[parameters('location')]",
+      "properties": {
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', format('cosmosproof-logs-{0}', variables('suffix'))), '2023-09-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', format('cosmosproof-logs-{0}', variables('suffix'))), '2023-09-01').primarySharedKey]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', format('cosmosproof-logs-{0}', variables('suffix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/jobs",
+      "apiVersion": "2024-03-01",
+      "name": "cosmosproof-scan",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'))]": {}
+        }
+      },
+      "properties": {
+        "environmentId": "[resourceId('Microsoft.App/managedEnvironments', 'cosmosproof-env')]",
+        "configuration": {
+          "triggerType": "Schedule",
+          "replicaTimeout": 1800,
+          "replicaRetryLimit": 1,
+          "scheduleTriggerConfig": {
+            "cronExpression": "[parameters('cron')]",
+            "parallelism": 1,
+            "replicaCompletionCount": 1
+          },
+          "secrets": [
+            {
+              "name": "scan-config",
+              "value": "[variables('scanConfig')]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "scanner",
+              "image": "[parameters('image')]",
+              "args": [
+                "scan",
+                "--markdown",
+                "/tmp/report.md"
+              ],
+              "env": [
+                {
+                  "name": "COSMOSPROOF_CONFIG",
+                  "secretRef": "scan-config"
+                },
+                {
+                  "name": "AZURE_CLIENT_ID",
+                  "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').clientId]"
+                }
+              ],
+              "resources": {
+                "cpu": "[json('0.5')]",
+                "memory": "1Gi"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', 'cosmosproof-env')]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity')]",
+        "[extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('reportsAccountName'), 'default', variables('reportsContainer')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('reportsAccountName'), 'default', variables('reportsContainer')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), 'Storage Blob Data Contributor'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "identityClientId": {
+      "type": "string",
+      "metadata": {
+        "description": "Application (client) ID of the CosmosProof identity: add it to Databricks as a service principal."
+      },
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').clientId]"
+    },
+    "identityPrincipalId": {
+      "type": "string",
+      "metadata": {
+        "description": "Object (principal) ID of the CosmosProof identity, for Azure role assignments."
+      },
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').principalId]"
+    },
+    "publishLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "Where each run is published."
+      },
+      "value": "[format('abfss://{0}@{1}.dfs.{2}/runs', variables('reportsContainer'), variables('reportsAccountName'), environment().suffixes.storage)]"
+    },
+    "grantsCommand": {
+      "type": "string",
+      "metadata": {
+        "description": "Print the grants to give, for a person to review and run."
+      },
+      "value": "[format('cosmosproof grants --application-id {0} --object-id {1} --subscription {2} --storage <resource-group>/{3} --catalog <catalog>', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').clientId, reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').principalId, subscription().subscriptionId, parameters('storageAccountName'))]"
+    }
+  }
+}
