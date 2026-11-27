@@ -64,3 +64,8 @@ The Connections screen generates these for exactly the selected resources.
 - **The metric model in `cosmosproof.audit` is the product's core output.** Dimensions (`dim_resource`, `dim_run`), facts (`fact_finding`, `fact_resource_scan`), an `event_log` and ready-made metric views (`v_kpis`, `v_cost_by_owner`, `v_cost_by_resource`, `v_trend`, `v_pii_at_rest`, `v_resource_health`). The app reads and plots it; a Databricks dashboard or Power BI over the Parquet export is the customer's option, not a requirement.
 
 Validated live on 2026-11-27: discovery through Resource Graph found the workspace and both ADLS accounts, suggested `dev` for the account tagged `environment=dev` and left it unselected; a full audit cycle scanned the selected workspace, wrote `cosmosproof.audit` and the eleven Parquet files to the reports storage, and the views returned the expected KPIs.
+
+Two rules added after running the cycle with the managed identity on 2026-11-27:
+
+- **Storage from table paths.** External locations are only listed for principals with privileges on them, so the identity saw none and scanned no storage. Containers are now also derived from the tables' own storage paths (visible with `BROWSE`), limited to the selected accounts and never the product's own container.
+- **Unverified is not resolved.** A finding is resolved only when its resource was judged in the run (storage seen, or lineage available). Otherwise it stays open and the event log says why; a failing or blind scan never makes waste look solved.

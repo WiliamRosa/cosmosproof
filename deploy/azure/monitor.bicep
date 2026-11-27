@@ -21,6 +21,9 @@ param image string
 @description('Cron expression (UTC) for the scan.')
 param cron string = '0 10 * * *'
 
+@description('Scanner command: audit (estate-wide, ADR 0010) or scan (one configured workspace).')
+param args array = [ 'audit' ]
+
 @secure()
 @description('cosmosproof.yml content. Use `auth: azure` for Databricks and `list_directly` for storage, so it holds no credential.')
 param scanConfig string
@@ -97,7 +100,7 @@ resource job 'Microsoft.App/jobs@2024-03-01' = {
         {
           name: 'scanner'
           image: image
-          args: [ 'scan', '--markdown', '/tmp/report.md' ]
+          args: args
           env: [
             { name: 'COSMOSPROOF_CONFIG', secretRef: 'scan-config' }
             { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }

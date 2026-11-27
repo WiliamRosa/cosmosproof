@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.49.2.45890",
-      "templateHash": "5524245051005369527"
+      "templateHash": "18037018805475803991"
     }
   },
   "parameters": {
@@ -16,28 +16,21 @@
         "description": "Location for all resources."
       }
     },
-    "databricksHost": {
+    "scopeType": {
       "type": "string",
+      "defaultValue": "subscriptions",
+      "allowedValues": [
+        "subscriptions",
+        "managementGroups"
+      ],
       "metadata": {
-        "description": "Azure Databricks workspace host, e.g. adb-1234567890123456.7.azuredatabricks.net."
+        "description": "Discovery scope: subscriptions or managementGroups."
       }
     },
-    "warehouseId": {
+    "scopeIds": {
       "type": "string",
       "metadata": {
-        "description": "ID of the SQL warehouse CosmosProof queries."
-      }
-    },
-    "storageAccountName": {
-      "type": "string",
-      "metadata": {
-        "description": "ADLS Gen2 account to scan."
-      }
-    },
-    "storageContainer": {
-      "type": "string",
-      "metadata": {
-        "description": "Container to scan in that account."
+        "description": "Comma-separated subscription IDs or management group IDs to discover. The identity needs Reader on them."
       }
     },
     "windowDays": {
@@ -53,14 +46,14 @@
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Date last access time tracking was enabled on the account (yyyy-mm-dd), or empty if it is off."
+        "description": "Date last access time tracking was enabled on the ADLS accounts (yyyy-mm-dd), or empty if it is off."
       }
     },
     "cron": {
       "type": "string",
       "defaultValue": "0 6 * * *",
       "metadata": {
-        "description": "Daily scan time, as a cron expression in UTC."
+        "description": "Daily audit time, as a cron expression in UTC."
       }
     },
     "image": {
@@ -82,8 +75,9 @@
     "suffix": "[uniqueString(resourceGroup().id)]",
     "reportsAccountName": "[take(format('cpreports{0}', variables('suffix')), 24)]",
     "reportsContainer": "cosmosproof-reports",
-    "trackingLine": "[if(empty(parameters('accessTrackingSince')), '', format('\n    access_tracking_since: {0}', parameters('accessTrackingSince')))]",
-    "scanConfig": "[format('window_days: {0}\r\ndatabricks:\r\n  source:\r\n    type: databricks\r\n    max_rows: 1000000\r\n    timeout_seconds: 600\r\n    options:\r\n      server_hostname: {1}\r\n      http_path: /sql/1.0/warehouses/{2}\r\n      auth: azure\r\nstorage:\r\n  - account: {3}\r\n    container: {4}\r\n    list_directly: true{5}\r\npublish: abfss://{6}@{7}.dfs.{8}/runs\r\n', parameters('windowDays'), parameters('databricksHost'), parameters('warehouseId'), parameters('storageAccountName'), parameters('storageContainer'), variables('trackingLine'), variables('reportsContainer'), variables('reportsAccountName'), environment().suffixes.storage)]"
+    "scopeKey": "[if(equals(parameters('scopeType'), 'subscriptions'), 'subscriptions', 'management_groups')]",
+    "trackingBlock": "[if(empty(parameters('accessTrackingSince')), '', format('storage:\n  access_tracking_since: {0}\n', parameters('accessTrackingSince')))]",
+    "auditConfig": "[format('location: abfss://{0}@{1}.dfs.{2}/audit\r\ndiscovery:\r\n  {3}: [{4}]\r\nwindow_days: {5}\r\n{6}', variables('reportsContainer'), variables('reportsAccountName'), environment().suffixes.storage, variables('scopeKey'), parameters('scopeIds'), parameters('windowDays'), variables('trackingBlock'))]"
   },
   "resources": [
     {
@@ -209,7 +203,7 @@
           "secrets": [
             {
               "name": "scan-config",
-              "value": "[variables('scanConfig')]"
+              "value": "[variables('auditConfig')]"
             }
           ]
         },
@@ -219,9 +213,7 @@
               "name": "scanner",
               "image": "[parameters('image')]",
               "args": [
-                "scan",
-                "--markdown",
-                "/tmp/report.md"
+                "audit"
               ],
               "env": [
                 {
@@ -263,19 +255,19 @@
       },
       "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').principalId]"
     },
-    "publishLocation": {
+    "auditLocation": {
       "type": "string",
       "metadata": {
-        "description": "Where each run is published."
+        "description": "Where cosmosproof.audit, the selection and the Parquet model live."
       },
-      "value": "[format('abfss://{0}@{1}.dfs.{2}/runs', variables('reportsContainer'), variables('reportsAccountName'), environment().suffixes.storage)]"
+      "value": "[format('abfss://{0}@{1}.dfs.{2}/audit', variables('reportsContainer'), variables('reportsAccountName'), environment().suffixes.storage)]"
     },
-    "grantsCommand": {
+    "nextSteps": {
       "type": "string",
       "metadata": {
-        "description": "Print the grants to give, for a person to review and run."
+        "description": "Next steps: grant Reader on the discovery scope, then install the app in a home workspace."
       },
-      "value": "[format('cosmosproof grants --application-id {0} --object-id {1} --subscription {2} --storage <resource-group>/{3} --catalog <catalog>', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').clientId, reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').principalId, subscription().subscriptionId, parameters('storageAccountName'))]"
+      "value": "[format('Grant Reader to object {0} on: {1}. Then a Databricks workspace administrator runs app/deploy.py with --identity-app-id {2}.', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').principalId, parameters('scopeIds'), reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'cosmosproof-identity'), '2023-01-31').clientId)]"
     }
   }
 }

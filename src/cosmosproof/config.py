@@ -94,6 +94,19 @@ class Rates(BaseModel):
     per_gb_month: dict[str, float] = {}
 
 
+class AutoStorage(BaseModel):
+    """Find the containers to list from the tables' storage paths, limited to these accounts.
+    External locations are only visible to principals with privileges on them; table storage
+    paths are visible with BROWSE."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    accounts: list[str]
+    exclude: list[str] = Field([], description="container@account pairs to leave out.")
+    access_tracking_since: date | None = None
+    access_logs: AccessLogs | None = None
+
+
 class ScanConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -115,6 +128,7 @@ class ScanConfig(BaseModel):
     )
     databricks: DatabricksConfig | None = None
     storage: list[StorageConfig] = []
+    auto_storage: AutoStorage | None = None
     publish: str | None = Field(
         None,
         description=(

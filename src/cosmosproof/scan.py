@@ -9,7 +9,7 @@ from cosmos_semantic.errors import ConnectorError
 
 from cosmosproof import __version__
 from cosmosproof.analyzer import Analyzer
-from cosmosproof.config import ScanConfig
+from cosmosproof.config import ScanConfig, StorageConfig
 from cosmosproof.federation import FederationSnapshot
 from cosmosproof.inventory import read_inventory
 from cosmosproof.model import Report
@@ -61,6 +61,32 @@ def _read_federation(source) -> tuple[FederationSnapshot | None, str | None]:
     return snapshot, " ".join(snapshot.notes) or None
 
 
+def _auto_storage(config: ScanConfig, snapshot: CatalogSnapshot) -> list[StorageConfig]:
+    auto = config.auto_storage
+    if auto is None:
+        return []
+    known = {(s.account, s.container) for s in config.storage}
+    found: set[tuple[str, str]] = set()
+    for table in snapshot.tables:
+        path = table.storage_path or ""
+        if not path.startswith("abfss://") or "@" not in path:
+            continue
+        container, rest = path.split("://", 1)[1].split("@", 1)
+        account = rest.split(".", 1)[0]
+        if account in auto.accounts and f"{container}@{account}" not in auto.exclude:
+            found.add((account, container))
+    return [
+        StorageConfig(
+            account=account,
+            container=container,
+            list_directly=True,
+            access_tracking_since=auto.access_tracking_since,
+            access_logs=auto.access_logs,
+        )
+        for account, container in sorted(found - known)
+    ]
+
+
 class ScanError(Exception):
     """A scan cannot start; the message says what to do."""
 
@@ -104,7 +130,7 @@ def run_scan(
     for table in snapshot.tables:
         table.ignored = table.full_name.split(".", 1)[0] in excluded
     storages = []
-    for storage in config.storage:
+    for storage in [*config.storage, *_auto_storage(config, snapshot)]:
         path = (inventories or {}).get((storage.account, storage.container)) or storage.inventory
         if path:
             blobs = read_inventory(path, storage.account, storage.container)
