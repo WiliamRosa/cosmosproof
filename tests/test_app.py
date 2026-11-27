@@ -111,9 +111,10 @@ def test_app_dark_mode_and_pagination(audit_dir, monkeypatch):
     at.toggle(key="dark_mode").set_value(True).run()
     assert not at.exception
     css = "".join(m.value for m in at.markdown)
-    assert "#0f1419" in css  # dark background
+    assert "#020617" in css  # dark background (console slate-950)
     at.selectbox(key="findings_size").set_value(10).run()
-    assert "página 1 de 1" in "".join(m.value for m in at.markdown)
+    text = "".join(m.value for m in at.markdown)
+    assert "Página 1 de 1" in text and "1–5 de 5" in text
 
 
 def test_app_resource_toggles_and_leave_out(audit_dir, monkeypatch):
@@ -160,8 +161,10 @@ def test_ui_escapes_and_colors():
 def test_badges_keep_black_text_in_both_themes():
     import ui
 
-    for theme in ("light", "dark"):
-        assert ".stApp span.cp-badge { color: #1f2328 !important; }" in ui.css(theme)
+    # Pills keep their own text color in both themes, over the rule that colors every span.
+    assert "color: #78350f !important" in ui.css("light")  # amber pill, light theme
+    assert "color: #fde68a !important" in ui.css("dark")  # amber pill, dark theme
+    assert 'class="cp-pill cp-pill-amber"' in ui.pill("Custo", "amber")
 
 
 def test_page_arrows(tmp_path, monkeypatch):
@@ -177,11 +180,20 @@ def test_page_arrows(tmp_path, monkeypatch):
     run_audit(config, discovered=([WS, SA], merge_selection([WS, SA], {})))
 
     at = _app(tmp_path, monkeypatch).run()
-    assert at.button(key="findings_prev").disabled and at.button(key="findings_first").disabled
+    assert at.button(key="findings_prev").disabled
+    assert "1–10 de 15" in "".join(m.value for m in at.markdown)
     at.button(key="findings_next").click().run()
     text = "".join(m.value for m in at.markdown)
-    assert "Página 2 de 2" in text
+    assert "Página 2 de 2" in text and "11–15 de 15" in text
     assert text.count('class="cp-card"') == 5
-    assert at.button(key="findings_last").disabled
-    at.button(key="findings_first").click().run()
+    assert at.button(key="findings_next").disabled
+    at.button(key="findings_prev").click().run()
     assert "Página 1 de 2" in "".join(m.value for m in at.markdown)
+
+
+def test_range_label():
+    import ui
+
+    assert ui.range_label(1, 25, 44, "{start}–{end} of {total}") == "1–25 of 44"
+    assert ui.range_label(2, 25, 44, "{start}–{end} of {total}") == "26–44 of 44"
+    assert ui.range_label(1, 25, 0, "{start}–{end} of {total}") == "0–0 of 0"

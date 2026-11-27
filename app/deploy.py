@@ -17,7 +17,16 @@ import os
 from pathlib import Path
 
 HERE = Path(__file__).parent
-FILES = ["app.py", "logic.py", "ui.py", "requirements.txt"]
+FILES = [
+    "app.py",
+    "logic.py",
+    "ui.py",
+    "requirements.txt",
+    "logo-light.svg",
+    "logo-dark.svg",
+    "mark-light.svg",
+    "mark-dark.svg",
+]
 NAME = "cosmosproof"
 
 

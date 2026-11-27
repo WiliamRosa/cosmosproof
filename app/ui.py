@@ -1,4 +1,5 @@
-"""Presentation helpers for the CosmosProof app: themes, pastel colors, cards and pages.
+"""Presentation helpers for the CosmosProof app, following the Cosmos Semantic console patterns
+(slate palette, sky accent, Inter, rounded cards, pill badges with a dot, table footer pagination).
 
 Pure functions that return CSS and HTML strings, so they can be tested without a browser.
 Every value that comes from the customer's metadata goes through `html.escape`.
@@ -10,50 +11,60 @@ import hashlib
 import html
 import math
 
+# Tailwind slate scale, as in the Cosmos Semantic console.
 THEMES = {
     "light": {
-        "bg": "#f6f7f9",
+        "bg": "#f8fafc",  # slate-50
         "card": "#ffffff",
-        "text": "#1f2328",
-        "muted": "#6b7280",
-        "border": "#e5e7eb",
-        "tint": 0.55,
-        "sidebar": "#eef0f3",
+        "text": "#0f172a",  # slate-900
+        "muted": "#64748b",  # slate-500
+        "border": "#e2e8f0",  # slate-200
+        "hover": "#f1f5f9",  # slate-100
+        "accent": "#0284c7",  # sky-600
+        "sidebar": "#f1f5f9",
+        "tint": 0.22,
     },
     "dark": {
-        "bg": "#0f1419",
-        "card": "#171d24",
-        "text": "#e6edf3",
-        "muted": "#9aa4b2",
-        "border": "#2b333c",
-        "tint": 0.18,
-        "sidebar": "#131920",
+        "bg": "#020617",  # slate-950
+        "card": "#0f172a",  # slate-900
+        "text": "#f1f5f9",  # slate-100
+        "muted": "#94a3b8",  # slate-400
+        "border": "#1e293b",  # slate-800
+        "hover": "#1e293b",
+        "accent": "#38bdf8",  # sky-400
+        "sidebar": "#0b1220",  # brand navy
+        "tint": 0.10,
     },
 }
 
+# Pill badges: (light background, light text, light ring, dark background, dark text, dark ring,
+# dot). The console's status tones, plus sky and violet.
+TONES = {
+    "emerald": ("#ecfdf5", "#065f46", "#a7f3d0", "#022c22", "#a7f3d0", "#065f46", "#10b981"),
+    "amber": ("#fffbeb", "#78350f", "#fde68a", "#451a03", "#fde68a", "#92400e", "#f59e0b"),
+    "rose": ("#fff1f2", "#9f1239", "#fecdd3", "#4c0519", "#fecdd3", "#9f1239", "#f43f5e"),
+    "slate": ("#f1f5f9", "#334155", "#e2e8f0", "#1e293b", "#cbd5e1", "#334155", "#94a3b8"),
+    "sky": ("#f0f9ff", "#075985", "#bae6fd", "#082f49", "#bae6fd", "#075985", "#0ea5e9"),
+    "violet": ("#f5f3ff", "#5b21b6", "#ddd6fe", "#2e1065", "#ddd6fe", "#5b21b6", "#8b5cf6"),
+}
+READING_TONES = {"cost": "amber", "risk": "rose", "compliance": "violet"}
+CONFIDENCE_TONES = {"high": "emerald", "medium": "amber", "low": "slate"}
+ENV_TONES = {"prod": "emerald", "dev": "sky", "test": "amber", "poc": "violet", "unknown": "slate"}
+
 # Pastel colors for resource groups, picked by a stable hash of the group name.
 PASTELS = [
-    "#a5d8ff",  # blue
-    "#b2f2bb",  # green
-    "#ffd8a8",  # orange
-    "#d0bfff",  # violet
-    "#ffec99",  # yellow
-    "#fcc2d7",  # pink
-    "#99e9f2",  # cyan
-    "#c3fae8",  # teal
-    "#eebefa",  # grape
-    "#dee2e6",  # gray
+    "#7dd3fc",  # sky-300
+    "#6ee7b7",  # emerald-300
+    "#fcd34d",  # amber-300
+    "#c4b5fd",  # violet-300
+    "#f9a8d4",  # pink-300
+    "#5eead4",  # teal-300
+    "#fdba74",  # orange-300
+    "#a5b4fc",  # indigo-300
+    "#bef264",  # lime-300
+    "#cbd5e1",  # slate-300, for "no group"
 ]
-READING_COLORS = {"cost": "#ffd8a8", "risk": "#ffc9c9", "compliance": "#d0bfff"}
-CONFIDENCE_COLORS = {"high": "#b2f2bb", "medium": "#ffec99", "low": "#dee2e6"}
-ENV_COLORS = {
-    "prod": "#b2f2bb",
-    "dev": "#a5d8ff",
-    "test": "#ffec99",
-    "poc": "#d0bfff",
-    "unknown": "#dee2e6",
-}
-CHART_PALETTE = ["#74c0fc", "#8ce99a", "#ffc078", "#b197fc", "#ffe066", "#faa2c1", "#66d9e8"]
+CHART_PALETTE = ["#38bdf8", "#34d399", "#fbbf24", "#a78bfa", "#f472b6", "#2dd4bf", "#fb923c"]
 
 
 def color_for(group: str | None) -> str:
@@ -71,55 +82,84 @@ def _rgba(hex_color: str, alpha: float) -> str:
 
 def css(theme: str) -> str:
     t = THEMES[theme]
+    dark = theme == "dark"
+    pills = "\n".join(
+        f".stApp span.cp-pill-{name} {{ background: {v[3] if dark else v[0]}; "
+        f"color: {v[4] if dark else v[1]} !important; "
+        f"box-shadow: inset 0 0 0 1px {v[5] if dark else v[2]}; }}\n"
+        f".cp-pill-{name} .cp-pill-dot {{ background: {v[6]}; }}"
+        for name, v in TONES.items()
+    )
     return f"""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
+.stApp, .stApp * {{ font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+  Roboto, Arial, sans-serif; }}
 .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {{
   background: {t["bg"]}; color: {t["text"]};
 }}
-[data-testid="stSidebar"] {{ background: {t["sidebar"]}; }}
+[data-testid="stSidebar"] {{ background: {t["sidebar"]}; border-right: 1px solid {t["border"]}; }}
 .stApp p, .stApp span, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp li,
 [data-testid="stMetricValue"], [data-testid="stMetricLabel"], [data-testid="stCaptionContainer"] {{
   color: {t["text"]} !important;
 }}
+.stApp h2, .stApp h3 {{ font-weight: 600; letter-spacing: -0.01em; }}
 [data-testid="stMetric"] {{
   background: {t["card"]}; border: 1px solid {t["border"]}; border-radius: 12px;
-  padding: 14px 16px;
+  padding: 16px; box-shadow: 0 1px 2px rgba(15,23,42,0.04);
 }}
-.stTabs [data-baseweb="tab-list"] {{ border-bottom-color: {t["border"]}; }}
-.cp-muted {{ color: {t["muted"]}; font-size: 0.85rem; }}
-.cp-card {{
-  border: 1px solid {t["border"]}; border-left-width: 6px; border-radius: 10px;
-  padding: 10px 14px; margin: 0 0 10px 0; color: {t["text"]};
-}}
+[data-testid="stMetricLabel"] p {{ font-size: 0.75rem; font-weight: 500; color: {t["muted"]} !important; }}
+[data-testid="stMetricValue"] {{ font-weight: 600; font-variant-numeric: tabular-nums; }}
+.stTabs [data-baseweb="tab-list"] {{ border-bottom: 1px solid {t["border"]}; gap: 4px; }}
+.stTabs [aria-selected="true"] p {{ color: {t["accent"]} !important; font-weight: 600; }}
+.cp-muted {{ color: {t["muted"]} !important; font-size: 0.82rem; }}
+.cp-list {{ background: {t["card"]}; border: 1px solid {t["border"]}; border-radius: 12px;
+  overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }}
+.cp-card {{ border-bottom: 1px solid {t["border"]}; border-left: 4px solid transparent;
+  padding: 12px 16px; color: {t["text"]}; }}
+.cp-card:last-child {{ border-bottom: 0; }}
+.cp-card:hover {{ filter: brightness({0.98 if not dark else 1.15}); }}
 .cp-card summary {{ cursor: pointer; list-style: none; }}
 .cp-card summary::-webkit-details-marker {{ display: none; }}
-.cp-title {{ font-weight: 600; word-break: break-all; }}
-.cp-meta {{ color: {t["muted"]}; font-size: 0.82rem; margin-top: 4px; }}
-.cp-body {{ margin-top: 8px; font-size: 0.9rem; }}
+.cp-eyebrow {{ font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: {t["muted"]}; }}
+.cp-title {{ font-weight: 600; color: {t["accent"]}; word-break: break-all; }}
+.cp-meta {{ color: {t["muted"]}; font-size: 0.82rem; margin-top: 2px; }}
+.cp-body {{ margin-top: 10px; font-size: 0.88rem; line-height: 1.55; }}
 .cp-body ul {{ margin: 4px 0 8px 18px; padding: 0; }}
-.cp-badge {{
-  display: inline-block; border-radius: 999px; padding: 1px 9px; margin-right: 6px;
-  font-size: 0.75rem; font-weight: 600;
-}}
-/* Badges sit on pastel backgrounds in both themes: their text stays black, overriding the
-   theme rule that colors every span. */
-.stApp span.cp-badge {{ color: #1f2328 !important; }}
-.cp-proof {{ font-family: ui-monospace, monospace; font-size: 0.75rem; color: {t["muted"]};
-  word-break: break-all; }}
-.cp-legend span {{ display: inline-block; margin: 0 12px 6px 0; font-size: 0.82rem; }}
+.cp-pill {{ display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+  padding: 1px 9px; margin-right: 6px; font-size: 0.72rem; font-weight: 600;
+  white-space: nowrap; }}
+.cp-pill-dot {{ width: 6px; height: 6px; border-radius: 999px; display: inline-block; }}
+{pills}
+.cp-proof {{ font-family: ui-monospace, SFMono-Regular, monospace !important; font-size: 0.72rem;
+  color: {t["muted"]}; word-break: break-all; }}
+.cp-legend span {{ display: inline-block; margin: 0 12px 6px 0; font-size: 0.8rem; }}
 .cp-dot {{ display: inline-block; width: 10px; height: 10px; border-radius: 3px;
   margin-right: 5px; vertical-align: middle; }}
-.cp-row {{ border-bottom: 1px solid {t["border"]}; padding: 6px 0; }}
-.cp-table {{ width: 100%; border-collapse: collapse; font-size: 0.9rem; color: {t["text"]}; }}
-.cp-table th, .cp-table td {{ border-bottom: 1px solid {t["border"]}; padding: 8px 6px;
-  text-align: left; vertical-align: top; }}
-.cp-table th {{ color: {t["muted"]}; font-weight: 600; }}
+.cp-row {{ padding: 4px 0; }}
+.cp-table {{ width: 100%; border-collapse: collapse; font-size: 0.88rem; color: {t["text"]};
+  background: {t["card"]}; border: 1px solid {t["border"]}; border-radius: 12px; overflow: hidden; }}
+.cp-table th {{ font-size: 0.75rem; font-weight: 500; color: {t["muted"]}; text-align: left;
+  padding: 10px 16px; border-bottom: 1px solid {t["border"]}; }}
+.cp-table td {{ padding: 12px 16px; border-bottom: 1px solid {t["border"]}; vertical-align: top; }}
+.cp-table tr:last-child td {{ border-bottom: 0; }}
+.cp-footer {{ color: {t["muted"]}; font-size: 0.85rem; font-variant-numeric: tabular-nums;
+  padding-top: 8px; }}
+[class*="st-key-"][class*="_prev"] button, [class*="st-key-"][class*="_next"] button {{
+  border-radius: 8px; border: 1px solid {t["border"]}; background: {t["card"]};
+  color: {t["text"]}; min-height: 32px; padding: 0 10px;
+}}
 </style>
 """
 
 
-def badge(text: str, color: str) -> str:
-    return f'<span class="cp-badge" style="background:{color}">{html.escape(text)}</span>'
+def pill(text: str, tone: str) -> str:
+    tone = tone if tone in TONES else "slate"
+    return (
+        f'<span class="cp-pill cp-pill-{tone}"><i class="cp-pill-dot"></i>'
+        f"{html.escape(text)}</span>"
+    )
 
 
 def legend(groups: list[str]) -> str:
@@ -134,21 +174,20 @@ def finding_card(f: dict, labels: dict, theme: str, evidence: list, notes: list)
     color = color_for(f.get("resource_group"))
     tint = _rgba(color, THEMES[theme]["tint"])
     cost = (
-        f" · {f['monthly_cost']:,.2f} {html.escape(f.get('currency') or '')}"
+        f" · {f['monthly_cost']:,.2f} {f.get('currency') or ''}"
         if f.get("monthly_cost") is not None
         else ""
     )
     size = f" · {f['size_bytes'] / 1024**2:,.1f} MB" if f.get("size_bytes") else ""
     reading = f.get("reading") or ""
-    head = (
-        badge(labels.get(f"reading_{reading}", reading), READING_COLORS.get(reading, "#dee2e6"))
-        + badge(f.get("confidence") or "", CONFIDENCE_COLORS.get(f.get("confidence"), "#dee2e6"))
-        + f'<span class="cp-title">{html.escape(f.get("asset") or "")}</span>'
-    )
+    confidence = f.get("confidence") or ""
+    eyebrow = f"{html.escape(f.get('kind') or '')} · {html.escape(f.get('resource_group') or '—')}"
+    pills = pill(
+        labels.get(f"reading_{reading}", reading), READING_TONES.get(reading, "slate")
+    ) + pill(confidence, CONFIDENCE_TONES.get(confidence, "slate"))
     meta = (
-        f"{html.escape(f.get('kind') or '')} · {labels['owner']}: "
-        f"{html.escape(f.get('owner') or '—')} · {html.escape(f.get('resource_name') or '—')}"
-        f" ({html.escape(f.get('resource_group') or '—')}){html.escape(cost)}{html.escape(size)}"
+        f"{labels['owner']}: {html.escape(f.get('owner') or '—')} · "
+        f"{html.escape(f.get('resource_name') or '—')}{html.escape(cost)}{html.escape(size)}"
     )
     ev = "".join(
         f"<li>{html.escape(e.get('source', ''))}: {html.escape(e.get('signal', ''))}"
@@ -166,8 +205,14 @@ def finding_card(f: dict, labels: dict, theme: str, evidence: list, notes: list)
     )
     return (
         f'<details class="cp-card" style="background:{tint};border-left-color:{color}">'
-        f'<summary><div>{head}</div><div class="cp-meta">{meta}</div></summary>{body}</details>'
+        f'<summary><div class="cp-eyebrow">{eyebrow}</div>'
+        f'<div>{pills}<span class="cp-title">{html.escape(f.get("asset") or "")}</span></div>'
+        f'<div class="cp-meta">{meta}</div></summary>{body}</details>'
     )
+
+
+def card_list(cards: list[str]) -> str:
+    return f'<div class="cp-list">{"".join(cards)}</div>'
 
 
 def table(headers: list[str], rows: list[list[str]]) -> str:
@@ -176,6 +221,14 @@ def table(headers: list[str], rows: list[list[str]]) -> str:
         "<tr>" + "".join(f"<td>{html.escape(str(c))}</td>" for c in row) + "</tr>" for row in rows
     )
     return f'<table class="cp-table"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'
+
+
+def range_label(page_number: int, page_size: int, total: int, template: str) -> str:
+    """ "1–25 of 44", as in the console's table footer."""
+    if total == 0:
+        return template.format(start=0, end=0, total=0)
+    start = (page_number - 1) * page_size + 1
+    return template.format(start=start, end=min(start + page_size - 1, total), total=total)
 
 
 def page(items: list, page_number: int, page_size: int) -> tuple[list, int]:
