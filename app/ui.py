@@ -109,7 +109,10 @@ def css(theme: str) -> str:
   padding: 16px; box-shadow: 0 1px 2px rgba(15,23,42,0.04);
 }}
 [data-testid="stMetricLabel"] p {{ font-size: 0.75rem; font-weight: 500; color: {t["muted"]} !important; }}
-[data-testid="stMetricValue"] {{ font-weight: 600; font-variant-numeric: tabular-nums; }}
+[data-testid="stMetricValue"] {{ font-weight: 600; font-variant-numeric: tabular-nums; font-size: 1.35rem; }}
+.stApp h3 {{ font-size: 1.1rem !important; }}
+[data-testid="stMetricValue"] div, [data-testid="stMetricLabel"] div,
+[data-testid="stMetricLabel"] p {{ white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }}
 .stTabs [data-baseweb="tab-list"] {{ border-bottom: 1px solid {t["border"]}; gap: 4px; }}
 .stTabs [aria-selected="true"] p {{ color: {t["accent"]} !important; font-weight: 600; }}
 .cp-muted {{ color: {t["muted"]} !important; font-size: 0.82rem; }}

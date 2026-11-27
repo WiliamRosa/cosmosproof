@@ -14,13 +14,23 @@ The wizard (`createUiDefinition.json`) asks only for the discovery scope (subscr
 ## Build
 
 ```bash
-python deploy/azure/marketplace/build.py
+python deploy/azure/marketplace/build.py --pid <customer usage attribution GUID>
 ```
 
-It compiles `mainTemplate.json` and writes `cosmosproof-managed-app.zip` (git-ignored), the file to upload in the plan's technical configuration in Partner Center.
+It compiles `mainTemplate.json` and writes `cosmosproof-managed-app.zip` (git-ignored), the file to upload in the plan's technical configuration in Partner Center. `--pid` makes the plan's attribution GUID the default of `partnerCenterPid` in the packaged template only, since the wizard does not pass it.
+
+## The offer
+
+| File | Content |
+|---|---|
+| [partner-center.md](partner-center.md) | Step by step to create the offer and its plans |
+| [listing.md](listing.md) | Every listing field, ready to paste, with logos and screenshot captions |
+| [pricing-proposal.md](pricing-proposal.md) | Plans and prices to decide, consistent with the license |
+| [privacy-policy.md](privacy-policy.md), [terms-of-use.md](terms-of-use.md) | Sources of the pages published at cosmosdata.ai/proof/privacy and /proof/terms |
+| [screenshots/](screenshots/) | 1280x720 captures of the app over a fictional bank, made by [capture.py](capture.py) |
 
 ## Before submitting
 
 - The image `ghcr.io/wiliamrosa/cosmosproof:<version>` must be **public**: Container Apps validates it at deployment time.
-- Set `partnerCenterPid` to the customer usage attribution ID Partner Center assigns to the plan.
+- Build the package with the plan's attribution GUID (`--pid`).
 - `tests/test_marketplace.py` keeps the certification rules that failed before: every TextBox has a regex (also the optional ones), defaults satisfy it, and the wizard outputs match the template parameters.

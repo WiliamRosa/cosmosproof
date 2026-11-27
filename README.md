@@ -60,7 +60,8 @@ See [examples/cosmosproof.yml](examples/cosmosproof.yml). You need:
 To prepare those grants, `cosmosproof grants` prints every SQL grant and Azure CLI command (read-only roles only) for a person to review and run:
 
 ```bash
-cosmosproof grants --application-id <app-id> --object-id <object-id> \n  --subscription <sub-id> --storage rg-data/lake01 --catalog main
+cosmosproof grants --application-id <app-id> --object-id <object-id> \
+  --subscription <sub-id> --storage rg-data/lake01 --catalog main
 ```
 
 CosmosProof only reads. It never deletes, moves or changes anything, and never runs those commands itself.
