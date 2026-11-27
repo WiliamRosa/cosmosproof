@@ -156,3 +156,9 @@ def test_unverified_resources_keep_their_findings_open(tmp_path):
             "r3", datetime(2026, 11, 29, tzinfo=UTC), "t", 1, [], 1, 0, judged={"/ws/prd"}
         )
         assert counts["resolved"] == len(findings)
+
+
+def test_own_catalogs_are_never_judged():
+    config = AuditConfig(location="/tmp/x", exclude_catalogs=["samples", "sandbox"])
+    scan = scan_config_for(WS, {"acct1"}, "abc123", config)
+    assert scan.exclude_catalogs == ["cosmosproof", "samples", "sandbox"]

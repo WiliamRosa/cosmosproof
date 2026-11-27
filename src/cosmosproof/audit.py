@@ -68,6 +68,10 @@ class AuditConfig(BaseModel):
     window_days: int = Field(180, ge=1)
     window_hours: float | None = Field(None, gt=0)
     exclude_catalogs: list[str] = ["samples"]
+    own_catalogs: list[str] = Field(
+        ["cosmosproof"],
+        description="CosmosProof's own catalogs (the app's data): never judged.",
+    )
     storage: StorageDefaults = StorageDefaults()
     rates: Rates | None = None
     list_price_discount: float = Field(0.0, ge=0, lt=1)
@@ -136,7 +140,7 @@ def scan_config_for(
     return ScanConfig(
         window_days=config.window_days,
         window_hours=config.window_hours,
-        exclude_catalogs=config.exclude_catalogs,
+        exclude_catalogs=sorted({*config.exclude_catalogs, *config.own_catalogs}),
         rates=config.rates,
         databricks=DatabricksConfig(
             source={
