@@ -12,7 +12,7 @@ One map, three readings:
 | Risk | Which production credentials and database loads exist with no real use? |
 | Compliance (LGPD) | Which personal data is stored with no purpose in use? |
 
-> Status: pre-alpha. Phase 1 (ADLS Gen2 + Unity Catalog + LGPD reading) works and was validated against real Unity Catalog system tables. See the [roadmap](docs/roadmap.md).
+> Status: pre-alpha. Phase 1 (ADLS Gen2 + Unity Catalog + LGPD reading) and phase 2 (jobs and pipelines, including Lakeflow Connect, that feed tables nobody reads, with their compute cost) work and were validated against real Unity Catalog system tables. See the [roadmap](docs/roadmap.md).
 
 ## Try it in one minute
 
@@ -38,7 +38,7 @@ What could not be seen:
 Proof: `sha256:...` · id `ab8825127671`
 ```
 
-The same table also gets a compliance finding, because it holds `cpf`, `email` and `nome_completo`.
+The same table also gets a compliance finding, because it holds `cpf`, `email` and `nome_completo`. And the demo's Lakeflow Connect pipeline that ingests from SQL Server into a table nobody reads shows up with its compute cost: usually the biggest number in the report.
 
 ## Scan your own workspace
 
@@ -49,7 +49,7 @@ cosmosproof scan -c cosmosproof.yml -o report.json -m report.md
 
 See [examples/cosmosproof.yml](examples/cosmosproof.yml). You need:
 
-- A Databricks SQL warehouse and a principal with `USE` and `SELECT` on the `system` schemas.
+- A Databricks SQL warehouse and a principal with `USE` and `SELECT` on the `system` schemas (`access`, `information_schema`, and for jobs and pipelines `lakeflow` and `billing`).
 - Optionally, one [Blob Inventory](https://learn.microsoft.com/en-us/azure/storage/blobs/blob-inventory) report per ADLS container, with `LastAccessTime`, `AccessTier` and `Content-Length`. Without it, findings stay at medium confidence and have no size or cost.
 - Optionally, [last access time tracking](https://learn.microsoft.com/en-us/azure/storage/blobs/access-tiers-overview) enabled on the storage account. It only records from activation onwards; the Unity Catalog history (about one year) covers the past.
 

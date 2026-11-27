@@ -9,6 +9,7 @@ from cosmosproof.analyzer import Analyzer
 from cosmosproof.config import Rates, StorageConfig
 from cosmosproof.inventory import Blob, container_url
 from cosmosproof.model import Report
+from cosmosproof.producers import Producer, ProducerActivity, ProducerCost
 from cosmosproof.unity_catalog import Activity, CatalogSnapshot, TableInfo
 
 REFERENCE = date(2026, 11, 26)
@@ -120,10 +121,39 @@ def demo_inputs() -> tuple[CatalogSnapshot, list[tuple[StorageConfig, list[Blob]
     return CatalogSnapshot(tables=tables, activity=activity), [(storage, blobs)]
 
 
+def demo_producers() -> ProducerActivity:
+    """A Lakeflow Connect pipeline ingesting from SQL Server into a table nobody reads, and a
+    job that builds the accounts table dashboards use."""
+    ingest, build = "pipeline:7f3e-ingest", "job:4412"
+    return ProducerActivity(
+        writes={
+            ingest: {"main.bronze.transacoes_cdc": _at(0)},
+            build: {"main.silver.contas": _at(1)},
+        },
+        reads_by={
+            "main.raw.clientes_legado": {"other": _at(310)},
+            "main.silver.contas": {"other": _at(1)},
+            "main.gold.kpi_diario": {"other": _at(0)},
+        },
+        producers={
+            ingest: Producer(
+                ingest, "ingestao-transacoes-sqlserver", "plataforma-ingestao", "INGESTION_PIPELINE"
+            ),
+            build: Producer(build, "build-contas", "dados-core"),
+        },
+        costs={ingest: ProducerCost(2160.0, "USD", 4320.0, "DBU")},
+    )
+
+
 def demo_report(window_days: int = 180) -> Report:
     snapshot, storages = demo_inputs()
     analyzer = Analyzer(
-        snapshot, storages, reference=REFERENCE, window_days=window_days, rates=DEMO_RATES
+        snapshot,
+        storages,
+        reference=REFERENCE,
+        window_days=window_days,
+        rates=DEMO_RATES,
+        producers=demo_producers(),
     )
     findings = analyzer.run()
     return Report(

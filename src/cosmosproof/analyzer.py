@@ -16,6 +16,7 @@ from cosmos_semantic.bootstrap import _sensitivity
 from cosmosproof.config import Rates, StorageConfig
 from cosmosproof.inventory import Blob, container_url
 from cosmosproof.model import Evidence, Finding, finding_id
+from cosmosproof.producers import ProducerActivity
 from cosmosproof.unity_catalog import LINEAGE_HISTORY_DAYS, CatalogSnapshot, TableInfo
 
 LINEAGE = "system.access.table_lineage"
@@ -88,6 +89,7 @@ class Analyzer:
         window_days: int,
         rates: Rates | None = None,
         orphan_depth: int = 2,
+        producers: ProducerActivity | None = None,
     ) -> None:
         self.snapshot = snapshot
         self.storages = blobs_by_storage
@@ -95,6 +97,7 @@ class Analyzer:
         self.window_days = window_days
         self.rates = rates
         self.orphan_depth = orphan_depth
+        self.producers = producers
         self.end = datetime.combine(reference, time.max, tzinfo=UTC)
         self.cutoff = datetime.combine(
             reference - timedelta(days=window_days), time.min, tzinfo=UTC
@@ -118,6 +121,8 @@ class Analyzer:
             orphan = self._orphan_finding(prefix, group, path_reads)
             if orphan:
                 findings.append(orphan)
+        if self.producers is not None:
+            findings.extend(self._producer_findings())
         findings.sort(key=lambda f: (-(f.monthly_cost or 0), -f.size_bytes, f.asset))
         return [f.seal() for f in findings]
 
@@ -238,7 +243,7 @@ class Analyzer:
         if created and created > self.cutoff:
             return []
         activity = self.snapshot.activity
-        last_read = _utc(activity.table_reads.get(table.full_name))
+        last_read = self._last_read(table.full_name)
         if table.storage_path:
             location = _norm(table.storage_path)
             path_hits = [t for p, t in path_reads.items() if t and _under(p, location)]
@@ -297,6 +302,9 @@ class Analyzer:
             "last_write": last_write.isoformat() if last_write else None,
             "still_fed": fed,
         }
+        feeders = self._feeders(table.full_name)
+        if feeders:
+            details["fed_by"] = feeders
         findings = [
             Finding(
                 id=finding_id("unused_table", table.full_name),
@@ -406,3 +414,157 @@ class Analyzer:
             window_days=self.window_days,
             reference_date=self.reference,
         )
+
+    # --- producers (phase 2) ------------------------------------------------------------
+
+    def _producer_label(self, key: str) -> str:
+        kind, _, ident = key.partition(":")
+        meta = self.producers.producers.get(key) if self.producers else None
+        return f"{kind} {ident}" + (f" ({meta.name})" if meta and meta.name else "")
+
+    def _recent_outputs(self, key: str) -> dict[str, datetime]:
+        assert self.producers is not None
+        known = {t.full_name for t in self.snapshot.tables}
+        return {
+            table: last
+            for table, raw in self.producers.writes.get(key, {}).items()
+            if table in known and (last := _utc(raw)) and last >= self.cutoff
+        }
+
+    def _reads_excluding(self, table: str, ignored: set[str]) -> list[datetime]:
+        assert self.producers is not None
+        return [
+            read
+            for entity, raw in self.producers.reads_by.get(table, {}).items()
+            if entity not in ignored and (read := _utc(raw))
+        ]
+
+    def _dead_producers(self) -> set[str]:
+        """Producers whose recent outputs nobody uses. A read by a dead producer is not use
+        either, so the set grows until it is stable: job B reading A's table only to feed
+        tables nobody reads does not keep A alive."""
+        if self.producers is None:
+            return set()
+        if hasattr(self, "_dead"):
+            return self._dead
+        dead: set[str] = set()
+        changed = True
+        while changed:
+            changed = False
+            for key in self.producers.writes:
+                meta = self.producers.producers.get(key)
+                if key in dead or (meta and meta.deleted):
+                    continue
+                outputs = self._recent_outputs(key)
+                if not outputs:
+                    continue
+                ignored = dead | {key}
+                if not any(
+                    read >= self.cutoff
+                    for table in outputs
+                    for read in self._reads_excluding(table, ignored)
+                ):
+                    dead.add(key)
+                    changed = True
+        self._dead = dead
+        return dead
+
+    def _last_read(self, table: str) -> datetime | None:
+        """Last read that counts as use. Reads by dead producers do not count; a live
+        producer reading its own input still does, so intermediate tables of a used pipeline
+        are never flagged."""
+        if self.producers is None or table not in self.producers.reads_by:
+            return _utc(self.snapshot.activity.table_reads.get(table))
+        reads = self._reads_excluding(table, self._dead_producers())
+        return max(reads) if reads else None
+
+    def _feeders(self, table: str) -> list[str]:
+        if self.producers is None:
+            return []
+        return sorted(
+            self._producer_label(key)
+            for key, tables in self.producers.writes.items()
+            if (last := _utc(tables.get(table))) and last >= self.cutoff
+        )
+
+    def _producer_findings(self) -> list[Finding]:
+        assert self.producers is not None
+        activity = self.producers
+        dead = self._dead_producers()
+        findings: list[Finding] = []
+        for key in sorted(dead):
+            meta = activity.producers.get(key)
+            recent = self._recent_outputs(key)
+            outside = [read for table in recent for read in self._reads_excluding(table, dead)]
+            last_outside = max(outside) if outside else None
+            tables = sorted(recent)
+            evidence = [
+                Evidence(
+                    source=LINEAGE,
+                    signal=f"wrote {len(tables)} tables inside the window: " + ", ".join(tables),
+                    observed_at=max(recent.values()),
+                ),
+                Evidence(
+                    source=LINEAGE,
+                    signal=(
+                        "inside the window, none of them was read except by this producer or by "
+                        "other producers whose outputs nobody uses"
+                        + (
+                            f"; last other read {last_outside.date().isoformat()}"
+                            if last_outside
+                            else "; no other read in the lineage history"
+                        )
+                    ),
+                    observed_at=last_outside,
+                ),
+            ]
+            notes = [LINEAGE_PARTIAL]
+            cost = activity.costs.get(key)
+            monthly = currency = None
+            if cost and cost.currency:
+                monthly = round(cost.amount / self.window_days * 30, 2)
+                currency = cost.currency
+                unit = f" {cost.unit}" if cost.unit else ""
+                evidence.append(
+                    Evidence(
+                        source="system.billing.usage",
+                        signal=(
+                            f"{cost.quantity:,.2f}{unit} in the last {self.window_days} days, "
+                            f"{cost.amount:,.2f} {cost.currency} at list price"
+                        ),
+                    )
+                )
+                notes.append(
+                    "Cost uses Databricks list prices; contract discounts are not applied."
+                )
+            else:
+                notes.append("No billing data for this producer, so its cost is unknown.")
+            kind_detail = meta.kind_detail if meta else None
+            findings.append(
+                Finding(
+                    id=finding_id("unused_producer", key),
+                    reading="cost",
+                    kind="unused_producer",
+                    asset=self._producer_label(key),
+                    owner=meta.owner if meta else None,
+                    monthly_cost=monthly,
+                    currency=currency,
+                    confidence="medium",
+                    evidence=evidence,
+                    coverage_notes=notes,
+                    recommendation=(
+                        "This producer keeps running and paying for compute, but nothing outside "
+                        "it reads what it writes. Confirm with the owner whether its outputs are "
+                        "still needed before pausing its schedule."
+                    ),
+                    details={
+                        "producer": key,
+                        "type": kind_detail,
+                        "tables": {t: recent[t].isoformat() for t in tables},
+                        "window_cost": round(cost.amount, 2) if cost else None,
+                    },
+                    window_days=self.window_days,
+                    reference_date=self.reference,
+                )
+            )
+        return findings

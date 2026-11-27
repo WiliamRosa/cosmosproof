@@ -36,11 +36,7 @@ def _write(report: Report, out: Path | None, markdown: Path | None) -> None:
     if not out and not markdown:
         typer.echo(to_markdown(report))
     totals = report.totals()
-    cost = (
-        f", {totals['monthly_cost']:.2f} {totals['currency']}/month"
-        if totals["monthly_cost"] is not None
-        else ""
-    )
+    cost = "".join(f", {v:.2f} {c}/month" for c, v in totals["monthly_cost"].items())
     typer.echo(f"{totals['findings']} findings{cost}", err=True)
 
 

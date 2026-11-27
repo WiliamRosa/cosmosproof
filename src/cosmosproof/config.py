@@ -19,6 +19,10 @@ class SystemTables(BaseModel):
     lineage: str = "system.access.table_lineage"
     tables: str = "system.information_schema.tables"
     columns: str = "system.information_schema.columns"
+    jobs: str = "system.lakeflow.jobs"
+    pipelines: str = "system.lakeflow.pipelines"
+    billing_usage: str = "system.billing.usage"
+    list_prices: str = "system.billing.list_prices"
 
 
 class DatabricksConfig(BaseModel):
@@ -26,6 +30,9 @@ class DatabricksConfig(BaseModel):
 
     source: DataSourceConfig
     system_tables: SystemTables = SystemTables()
+    producers: bool = Field(
+        True, description="Analyze jobs and pipelines that feed tables nobody reads (phase 2)."
+    )
 
 
 class StorageConfig(BaseModel):

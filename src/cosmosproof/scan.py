@@ -11,6 +11,7 @@ from cosmosproof.analyzer import Analyzer
 from cosmosproof.config import ScanConfig
 from cosmosproof.inventory import read_inventory
 from cosmosproof.model import Report
+from cosmosproof.producers import ProducerActivity, read_producers
 from cosmosproof.unity_catalog import CatalogSnapshot, read_catalog
 
 
@@ -24,8 +25,17 @@ def run_scan(
     if config.databricks is None:
         raise ValueError("the configuration needs a `databricks` section")
     con = connector or connect(config.databricks.source)
+    names = config.databricks.system_tables
+    producer_notes: list[str] = []
+    producers: ProducerActivity | None = None
     try:
-        snapshot: CatalogSnapshot = read_catalog(con, config.databricks.system_tables, reference)
+        snapshot: CatalogSnapshot = read_catalog(con, names, reference)
+        if config.databricks.producers:
+            try:
+                producers = read_producers(con, names, reference, config.window_days)
+                producer_notes = producers.notes
+            except Exception as exc:  # optional phase; never block the storage scan
+                producer_notes = [f"Jobs and pipelines were not analyzed ({type(exc).__name__})."]
     finally:
         if connector is None:
             con.close()
@@ -43,9 +53,10 @@ def run_scan(
         window_days=config.window_days,
         rates=config.rates,
         orphan_depth=config.orphan_depth,
+        producers=producers,
     )
     findings = analyzer.run()
-    notes = list(analyzer.notes)
+    notes = [*analyzer.notes, *producer_notes]
     if not config.storage:
         notes.append("No ADLS inventory was given: sizes, costs and storage reads are unknown.")
     return Report(

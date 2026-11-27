@@ -15,9 +15,12 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 - [ ] Join `system.query.history` as a second read signal
 - [ ] Validation on an Azure Databricks workspace with ADLS external tables
 
-## Phase 2: Lakeflow Connect
+## Phase 2: Producers (jobs and pipelines, including Lakeflow Connect) — in progress
 
-- [ ] Ingestion pipelines whose target tables nobody reads, with the gateway compute cost
+- [x] Jobs and pipelines whose outputs nobody reads, with their compute cost at list price ([ADR 0005](decisions/0005-producers-and-compute-cost.md)), validated against a real workspace
+- [x] Reads by dead producers are not use; chains of dead producers are found to a fixed point
+- [x] Unused tables name the producers that still feed them
+- [ ] Contract discount factor for list prices
 - [ ] The same source table brought in several times (Lakeflow, JDBC, federation)
 
 ## Phase 3: Federation and database-side statistics

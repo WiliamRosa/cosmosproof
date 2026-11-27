@@ -146,3 +146,39 @@ def test_proof_hash_is_stable_and_sensitive():
     (b,) = run(*args)[0]
     (c,) = run([table("m.s.t", "t")], [blob("t/p.parquet", accessed=301)])[0]
     assert a.proof_hash == b.proof_hash != c.proof_hash
+
+
+def _producers(writes, reads_by):
+    from cosmosproof.producers import ProducerActivity
+
+    return ProducerActivity(writes=writes, reads_by=reads_by)
+
+
+def test_intermediate_table_of_a_used_job_is_not_flagged():
+    # job:a reads bronze to build gold; a dashboard ("other") reads gold.
+    tables = [table("m.s.bronze", None), table("m.s.gold", None)]
+    producers = _producers(
+        writes={"job:a": {"m.s.bronze": at(1), "m.s.gold": at(1)}},
+        reads_by={"m.s.bronze": {"job:a": at(1)}, "m.s.gold": {"other": at(2)}},
+    )
+    snap = CatalogSnapshot(tables=tables, activity=Activity(earliest_event=at(390)))
+    findings = Analyzer(snap, [], reference=REFERENCE, window_days=180, producers=producers).run()
+    assert findings == []
+
+
+def test_chain_of_dead_producers():
+    # job:a feeds t1; job:b reads t1 to feed t2; nobody reads t2. Both are dead.
+    tables = [table("m.s.t1", None), table("m.s.t2", None)]
+    producers = _producers(
+        writes={"job:a": {"m.s.t1": at(1)}, "job:b": {"m.s.t2": at(1)}},
+        reads_by={"m.s.t1": {"job:b": at(1)}},
+    )
+    snap = CatalogSnapshot(tables=tables, activity=Activity(earliest_event=at(390)))
+    findings = Analyzer(snap, [], reference=REFERENCE, window_days=180, producers=producers).run()
+    kinds = sorted((f.kind, f.asset) for f in findings)
+    assert kinds == [
+        ("unused_producer", "job a"),
+        ("unused_producer", "job b"),
+        ("unused_table", "m.s.t1"),
+        ("unused_table", "m.s.t2"),
+    ]

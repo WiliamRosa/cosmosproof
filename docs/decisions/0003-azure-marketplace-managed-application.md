@@ -20,7 +20,7 @@ The Cosmos Semantic template is the starting point, keeping the lessons above.
 | Storage Blob Data Reader on each storage account (or container) | Read Blob Inventory reports |
 | A Blob Inventory rule with `LastAccessTime`, `AccessTier`, `Content-Length` | File list, tier, last access |
 | Last access time tracking on each storage account | Free; only records from activation onwards |
-| The managed identity added to the Databricks workspace as a service principal, with `USE` and `SELECT` on the `system` schemas and `BROWSE` on catalogs | Lineage and catalog metadata |
+| The managed identity added to the Databricks workspace as a service principal, with `USE` and `SELECT` on the `system` schemas (`access`, `information_schema`, `lakeflow`, `billing`) and `BROWSE` on catalogs | Lineage, catalog metadata, jobs, pipelines and their cost |
 | CAN USE on one SQL warehouse | Running the system table queries |
 
 ## Consequences
