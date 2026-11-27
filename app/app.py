@@ -111,33 +111,39 @@ def chart(frame: pd.DataFrame, kind: str, x: str, y: str, theme: str, horizontal
     )
 
 
-def page_size(key: str, labels: dict, sizes=(10, 25, 50)) -> int:
-    left, _ = st.columns([1, 3])
-    return int(left.selectbox(labels["per_page"], sizes, key=f"{key}_size"))
-
-
-def current_page(key: str, pages: int) -> int:
-    """The page kept in session, clamped when filters or the page size shrink the list."""
+def page_state(key: str, total: int, sizes: tuple[int, ...]) -> tuple[int, int, int]:
+    """Page size and page from the session (the footer widgets render after the list), with
+    the page clamped when filters or the size shrink the list."""
+    size = int(st.session_state.get(f"{key}_size", sizes[0]))
+    pages = max(1, -(-total // size))
     number = min(max(int(st.session_state.get(f"{key}_page", 1)), 1), pages)
     st.session_state[f"{key}_page"] = number
-    return number
+    return number, size, pages
 
 
-def page_nav(key: str, number: int, pages: int, labels: dict) -> None:
-    """Arrows at the end of the list: first, previous, position, next, last."""
+def footer(
+    key: str, number: int, size: int, pages: int, total: int, labels: dict, sizes: tuple[int, ...]
+) -> None:
+    """As in the Cosmos Semantic console: "1–25 of 44" on the left; rows per page, "Page 1 of 2"
+    and previous / next on the right."""
 
     def go(target: int) -> None:
         st.session_state[f"{key}_page"] = target
 
-    first, prev, middle, nxt, last = st.columns([1, 1, 2, 1, 1])
-    first.button(
-        "⏮",
-        key=f"{key}_first",
-        help=labels["first"],
-        disabled=number <= 1,
-        on_click=go,
-        args=(1,),
-        width="stretch",
+    left, rows, select, position, prev, nxt = st.columns([5, 2, 1.3, 2, 0.6, 0.6])
+    left.markdown(
+        f'<div class="cp-footer">{ui.range_label(number, size, total, labels["range"])}</div>',
+        unsafe_allow_html=True,
+    )
+    rows.markdown(
+        f'<div class="cp-footer" style="text-align:right">{labels["per_page"]}</div>',
+        unsafe_allow_html=True,
+    )
+    select.selectbox(labels["per_page"], sizes, key=f"{key}_size", label_visibility="collapsed")
+    position.markdown(
+        f'<div class="cp-footer" style="text-align:center">'
+        f"{labels['page_of'].format(page=number, pages=pages)}</div>",
+        unsafe_allow_html=True,
     )
     prev.button(
         "‹",
@@ -146,12 +152,6 @@ def page_nav(key: str, number: int, pages: int, labels: dict) -> None:
         disabled=number <= 1,
         on_click=go,
         args=(number - 1,),
-        width="stretch",
-    )
-    middle.markdown(
-        f'<div class="cp-muted" style="text-align:center;padding-top:8px">'
-        f"{labels['page_of'].format(page=number, pages=pages)}</div>",
-        unsafe_allow_html=True,
     )
     nxt.button(
         "›",
@@ -160,16 +160,6 @@ def page_nav(key: str, number: int, pages: int, labels: dict) -> None:
         disabled=number >= pages,
         on_click=go,
         args=(number + 1,),
-        width="stretch",
-    )
-    last.button(
-        "⏭",
-        key=f"{key}_last",
-        help=labels["last"],
-        disabled=number >= pages,
-        on_click=go,
-        args=(pages,),
-        width="stretch",
     )
 
 
@@ -183,7 +173,13 @@ dark = st.sidebar.toggle(T["dark_mode"], key="dark_mode")
 theme = "dark" if dark else "light"
 st.markdown(ui.css(theme), unsafe_allow_html=True)
 
-st.title(T["title"])
+HERE = Path(__file__).parent
+st.logo(
+    str(HERE / f"logo-{theme}.svg"),
+    size="large",
+    icon_image=str(HERE / f"mark-{theme}.svg"),
+)
+st.image(str(HERE / f"logo-{theme}.svg"), width=260)
 st.caption(T["tagline"])
 
 data, resource_rows = load_store(LOCAL or VOLUME)
@@ -260,30 +256,24 @@ with tab_overview:
             + ui.legend(sorted({f["resource_group"] or "" for f in shown})),
             unsafe_allow_html=True,
         )
-        size = page_size("findings", T)
-        pages = max(1, -(-len(shown) // size))
-        number = current_page("findings", pages)
+        number, size, pages = page_state("findings", len(shown), (10, 25, 50))
         items, _ = ui.page(shown, number, size)
         st.markdown(
-            "".join(
-                ui.finding_card(
-                    f,
-                    T,
-                    theme,
-                    logic.parse_json(f["evidence"]),
-                    logic.parse_json(f["coverage_notes"]),
-                )
-                for f in items
+            ui.card_list(
+                [
+                    ui.finding_card(
+                        f,
+                        T,
+                        theme,
+                        logic.parse_json(f["evidence"]),
+                        logic.parse_json(f["coverage_notes"]),
+                    )
+                    for f in items
+                ]
             ),
             unsafe_allow_html=True,
         )
-        st.markdown(
-            '<div class="cp-muted">'
-            + T["showing"].format(n=len(items), total=len(shown), page=number, pages=pages)
-            + "</div>",
-            unsafe_allow_html=True,
-        )
-        page_nav("findings", number, pages, T)
+        footer("findings", number, size, pages, len(shown), T, (10, 25, 50))
 
 # --- resources -----------------------------------------------------------------------------
 
@@ -321,9 +311,7 @@ with tab_resources:
             resource_rows,
             key=lambda r: (r["subscription"], r["resource_group"], r["kind"], r["name"]),
         )
-        size = page_size("resources", T, sizes=(20, 50, 100))
-        res_pages = max(1, -(-len(ordered) // size))
-        number = current_page("resources", res_pages)
+        number, size, res_pages = page_state("resources", len(ordered), (20, 50, 100))
         items, _ = ui.page(ordered, number, size)
         current_group = None
         for r in items:
@@ -356,12 +344,12 @@ with tab_resources:
             )
             env = r["environment"] or "unknown"
             c3.markdown(
-                ui.badge(T.get(f"env_{env}", env), ui.ENV_COLORS.get(env, "#dee2e6"))
+                ui.pill(T.get(f"env_{env}", env), ui.ENV_TONES.get(env, "slate"))
                 + f'<span class="cp-muted">{T["suggested_by"]}: '
                 f"{html.escape(r['environment_source'] or '—')}</span>",
                 unsafe_allow_html=True,
             )
-        page_nav("resources", number, res_pages, T)
+        footer("resources", number, size, res_pages, len(ordered), T, (20, 50, 100))
         if st.button(T["save"], type="primary"):
             current = json.loads(read_bytes("selection.json") or b"{}")
             write_text(

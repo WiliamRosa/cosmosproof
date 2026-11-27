@@ -1,8 +1,10 @@
+<p align="center"><img src="brand/cosmosproof-horizontal-light.svg" alt="CosmosProof" width="420"></p>
+
 # CosmosProof
 
 **We show, with proof, what in your Azure Databricks costs money, creates risk or holds PII without being used.**
 
-Most data lakes keep paying for data nobody reads. Existing tools either optimize compute or flag "unused" tables from a single signal and admit false positives. CosmosProof crosses Unity Catalog lineage with ADLS Gen2 storage activity, only calls something unused when the evidence agrees, and every finding says what it could not see.
+CosmosProof is a Lakehouse FinOps product. Most data lakes keep paying for data nobody reads. Existing tools either optimize compute or flag "unused" tables from a single signal and admit false positives. CosmosProof crosses Unity Catalog lineage with ADLS Gen2 storage activity, only calls something unused when the evidence agrees, and every finding says what it could not see.
 
 One map, three readings:
 
