@@ -54,20 +54,24 @@ def _field(name: str, expression: str | None = None) -> dict:
     return {"name": name, "expression": expression or f"`{name}`"}
 
 
-def _counter(name: str, dataset: str, expression: str, title: str, x: int) -> dict:
+def _query(dataset: str, fields: list[dict], disaggregated: bool) -> list[dict]:
+    return [
+        {
+            "name": "main_query",
+            "query": {"datasetName": dataset, "fields": fields, "disaggregated": disaggregated},
+        }
+    ]
+
+
+def _position(x: int, y: int, width: int, height: int) -> dict:
+    return {"x": x, "y": y, "width": width, "height": height}
+
+
+def _counter(name: str, dataset: str, expression: str, title: str, x: int, y: int) -> dict:
     return {
         "widget": {
             "name": name,
-            "queries": [
-                {
-                    "name": "main_query",
-                    "query": {
-                        "datasetName": dataset,
-                        "fields": [_field("value", expression)],
-                        "disaggregated": False,
-                    },
-                }
-            ],
+            "queries": _query(dataset, [_field("value", expression)], False),
             "spec": {
                 "version": 2,
                 "widgetType": "counter",
@@ -75,34 +79,95 @@ def _counter(name: str, dataset: str, expression: str, title: str, x: int) -> di
                 "frame": {"showTitle": True, "title": title},
             },
         },
-        "position": {"x": x, "y": 1, "width": 2, "height": 3},
+        "position": _position(x, y, 1, 2),
     }
 
 
-def _table(name: str, dataset: str, columns: list[tuple[str, str]], title: str, y: int) -> dict:
+def _bar(name, dataset, x_field, x_label, y_field, y_expr, y_label, title, pos, color=None):
+    fields = [_field(x_field), _field(y_field, y_expr)]
+    encodings = {
+        "x": {"fieldName": x_field, "scale": {"type": "categorical"}, "displayName": x_label},
+        "y": {"fieldName": y_field, "scale": {"type": "quantitative"}, "displayName": y_label},
+    }
+    if color:
+        fields.append(_field(color[0]))
+        encodings["color"] = {
+            "fieldName": color[0],
+            "scale": {"type": "categorical"},
+            "displayName": color[1],
+        }
     return {
         "widget": {
             "name": name,
-            "queries": [
-                {
-                    "name": "main_query",
-                    "query": {
-                        "datasetName": dataset,
-                        "fields": [_field(c) for c, _ in columns],
-                        "disaggregated": True,
-                    },
-                }
-            ],
+            "queries": _query(dataset, fields, False),
+            "spec": {
+                "version": 3,
+                "widgetType": "bar",
+                "encodings": encodings,
+                "frame": {"showTitle": True, "title": title},
+            },
+        },
+        "position": pos,
+    }
+
+
+# The table widget needs the full column definition; with only a field name and a display name
+# the dashboard shows "Invalid widget definition".
+NUMBER_COLUMNS = {"monthly_cost", "size_gb"}
+
+
+def _column(field: str, title: str, order: int) -> dict:
+    number = field in NUMBER_COLUMNS
+    column = {
+        "fieldName": field,
+        "booleanValues": ["false", "true"],
+        "imageUrlTemplate": "{{ @ }}",
+        "imageTitleTemplate": "{{ @ }}",
+        "imageWidth": "",
+        "imageHeight": "",
+        "linkUrlTemplate": "{{ @ }}",
+        "linkTextTemplate": "{{ @ }}",
+        "linkTitleTemplate": "{{ @ }}",
+        "linkOpenInNewTab": True,
+        "type": "float" if number else "string",
+        "displayAs": "number" if number else "string",
+        "visible": True,
+        "order": 100000 + order,
+        "title": title,
+        "allowSearch": not number,
+        "alignContent": "right" if number else "left",
+        "allowHTML": False,
+        "highlightLinks": False,
+        "useMonospaceFont": field == "proof_hash",
+        "preserveWhitespace": field in {"evidence", "coverage_notes"},
+        "displayName": title,
+    }
+    if number:
+        column["numberFormat"] = "0.00"
+    return column
+
+
+def _table(name: str, dataset: str, columns: list[tuple[str, str]], title: str, pos: dict) -> dict:
+    return {
+        "widget": {
+            "name": name,
+            "queries": _query(dataset, [_field(c) for c, _ in columns], True),
             "spec": {
                 "version": 1,
                 "widgetType": "table",
                 "encodings": {
-                    "columns": [{"fieldName": c, "displayName": label} for c, label in columns]
+                    "columns": [_column(c, label, i) for i, (c, label) in enumerate(columns)]
                 },
+                "invisibleColumns": [],
+                "allowHTMLByDefault": False,
+                "itemsPerPage": 25,
+                "paginationSize": "default",
+                "condensed": True,
+                "withRowNumber": False,
                 "frame": {"showTitle": True, "title": title},
             },
         },
-        "position": {"x": 0, "y": y, "width": 6, "height": 7},
+        "position": pos,
     }
 
 
@@ -110,10 +175,14 @@ def dashboard(schema: str) -> dict:
     datasets = [
         {
             "name": "latest",
-            "displayName": "Latest findings",
+            "displayName": "Open findings",
             "queryLines": [
-                "SELECT reading, kind, asset, owner, confidence, status, monthly_cost, currency, ",
-                "ROUND(size_bytes / 1024 / 1024, 1) AS size_mb, recommendation, evidence, ",
+                "SELECT reading, kind, asset, coalesce(owner, 'unknown') AS owner, confidence, ",
+                "status, monthly_cost, currency, ",
+                "ROUND(size_bytes / 1024 / 1024 / 1024, 2) AS size_gb, recommendation, evidence, ",
+                # A compliance finding repeats the size of its table's cost finding.
+                "CASE WHEN reading = 'cost' THEN ROUND(size_bytes / 1024 / 1024 / 1024, 2) END ",
+                "AS cost_size_gb, ",
                 "coverage_notes, proof_hash ",
                 f"FROM {schema}.latest WHERE status <> 'resolved' ",
                 "ORDER BY monthly_cost DESC NULLS LAST",
@@ -123,7 +192,8 @@ def dashboard(schema: str) -> dict:
             "name": "changes",
             "displayName": "Changes since the previous run",
             "queryLines": [
-                "SELECT status, reading, kind, asset, owner, confidence, monthly_cost, currency ",
+                "SELECT status, reading, kind, asset, coalesce(owner, 'unknown') AS owner, ",
+                "confidence, monthly_cost, currency ",
                 f"FROM {schema}.latest WHERE status IN ('new', 'resolved')",
             ],
         },
@@ -142,7 +212,7 @@ def dashboard(schema: str) -> dict:
         ("status", "Status"),
         ("monthly_cost", "Monthly cost"),
         ("currency", "Currency"),
-        ("size_mb", "Size (MB)"),
+        ("size_gb", "Size (GB)"),
         ("recommendation", "Recommendation"),
         ("evidence", "Evidence"),
         ("coverage_notes", "What could not be seen"),
@@ -155,65 +225,63 @@ def dashboard(schema: str) -> dict:
                 "multilineTextboxSpec": {
                     "lines": [
                         "## CosmosProof\n",
-                        "What in this workspace costs money, creates risk or holds personal data "
-                        "without being used, with the evidence behind each finding. "
-                        "CosmosProof only reads; every action is a person's decision.",
+                        "\n",
+                        "What in this workspace **costs money, creates risk or holds personal "
+                        "data without being used**, with the evidence behind each finding. "
+                        "Costs use your storage rates and Databricks list prices. CosmosProof "
+                        "only reads: every action is a person's decision.\n",
                     ]
                 },
             },
-            "position": {"x": 0, "y": 0, "width": 6, "height": 1},
+            "position": _position(0, 0, 6, 2),
         },
-        _counter("open", "latest", "COUNT(`asset`)", "Open findings", 0),
+        _counter("open", "latest", "COUNT(`asset`)", "Open findings", 0, 2),
+        _counter("cost", "latest", "SUM(`monthly_cost`)", "Estimated monthly cost", 1, 2),
+        _counter("storage", "latest", "SUM(`cost_size_gb`)", "Unused storage (GB)", 2, 2),
         _counter(
-            "cost", "latest", "SUM(`monthly_cost`)", "Monthly cost (list prices / your rates)", 2
+            "personal",
+            "latest",
+            "COUNT_IF(`reading` = 'compliance')",
+            "Personal data at rest (LGPD)",
+            3,
+            2,
         ),
-        _counter("new", "changes", "COUNT_IF(`status` = 'new')", "New since the previous run", 4),
-        {
-            "widget": {
-                "name": "by_reading",
-                "queries": [
-                    {
-                        "name": "main_query",
-                        "query": {
-                            "datasetName": "latest",
-                            "fields": [_field("reading"), _field("findings", "COUNT(`asset`)")],
-                            "disaggregated": False,
-                        },
-                    }
-                ],
-                "spec": {
-                    "version": 3,
-                    "widgetType": "bar",
-                    "encodings": {
-                        "x": {
-                            "fieldName": "reading",
-                            "scale": {"type": "categorical"},
-                            "displayName": "Reading",
-                        },
-                        "y": {
-                            "fieldName": "findings",
-                            "scale": {"type": "quantitative"},
-                            "displayName": "Findings",
-                        },
-                    },
-                    "frame": {"showTitle": True, "title": "Findings by reading"},
-                },
-            },
-            "position": {"x": 0, "y": 4, "width": 3, "height": 5},
-        },
+        _counter("new", "changes", "COUNT_IF(`status` = 'new')", "New since last run", 4, 2),
+        _counter(
+            "resolved",
+            "changes",
+            "COUNT_IF(`status` = 'resolved')",
+            "Resolved since last run",
+            5,
+            2,
+        ),
+        _bar(
+            "by_reading",
+            "latest",
+            "reading",
+            "Reading",
+            "findings",
+            "COUNT(`asset`)",
+            "Findings",
+            "Findings by reading and confidence",
+            _position(0, 4, 2, 6),
+            color=("confidence", "Confidence"),
+        ),
+        _bar(
+            "by_owner",
+            "latest",
+            "owner",
+            "Owner",
+            "cost",
+            "SUM(`monthly_cost`)",
+            "Monthly cost",
+            "Monthly cost by owner",
+            _position(2, 4, 2, 6),
+        ),
         {
             "widget": {
                 "name": "over_time",
-                "queries": [
-                    {
-                        "name": "main_query",
-                        "query": {
-                            "datasetName": "runs",
-                            "fields": [_field("generated_ts"), _field("open_findings")],
-                            "disaggregated": True,
-                        },
-                    }
-                ],
+                "queries": _query("runs", [_field("generated_ts"), _field("open_findings")], True),
                 "spec": {
                     "version": 3,
                     "widgetType": "line",
@@ -229,10 +297,10 @@ def dashboard(schema: str) -> dict:
                             "displayName": "Open findings",
                         },
                     },
-                    "frame": {"showTitle": True, "title": "Open findings over time"},
+                    "frame": {"showTitle": True, "title": "Open findings per run"},
                 },
             },
-            "position": {"x": 3, "y": 4, "width": 3, "height": 5},
+            "position": _position(4, 4, 2, 6),
         },
         _table(
             "changes_table",
@@ -245,11 +313,18 @@ def dashboard(schema: str) -> dict:
                 ("owner", "Owner"),
                 ("confidence", "Confidence"),
                 ("monthly_cost", "Monthly cost"),
+                ("currency", "Currency"),
             ],
-            "New and resolved since the previous run",
-            9,
+            "New and resolved since the last run",
+            _position(0, 10, 6, 5),
         ),
-        _table("findings_table", "latest", columns, "Open findings with evidence", 16),
+        _table(
+            "findings_table",
+            "latest",
+            columns,
+            "Open findings with evidence",
+            _position(0, 15, 6, 10),
+        ),
     ]
     return {
         "datasets": datasets,
