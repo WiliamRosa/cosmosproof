@@ -4,7 +4,7 @@ Thank you for your interest. Issues, questions and ideas are welcome in GitHub I
 
 **Code contributions are not accepted yet.** CosmosProof is licensed under the Business Source License 1.1 and is sold commercially; accepting outside code first needs a Contributor License Agreement, which does not exist yet. See [ADR 0002](docs/decisions/0002-repository-license-and-cosmos-dependency.md).
 
-If you need a change in the shared foundation (connectors, LGPD detection), contribute it to [Cosmos Semantic](https://github.com/WiliamRosa/cosmos-semantic-platform), which is Apache 2.0 and accepts contributions under the DCO.
+If you need a change in the shared foundation (connectors, PII detection), contribute it to [Cosmos Semantic](https://github.com/WiliamRosa/cosmos-semantic-platform), which is Apache 2.0 and accepts contributions under the DCO.
 
 ## Development
 

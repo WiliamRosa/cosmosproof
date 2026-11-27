@@ -11,7 +11,7 @@ Cosmos Semantic grew into a broad product that answers "what does it do?" with a
 
 **Name:** CosmosProof, published under the Cosmos Data publisher account already verified in Partner Center. It is a distinct product from Cosmos Semantic.
 
-**Promise:** we show, with proof, what in your Azure Databricks costs money, creates risk or breaks the LGPD necessity principle without being used.
+**Promise:** we show, with proof, what in your Azure Databricks costs money, creates risk or holds PII without being used.
 
 **One map, three readings:** cost (FinOps), risk (unused production credentials, load on transactional databases) and compliance (personal data at rest with no purpose in use).
 
@@ -20,7 +20,7 @@ Cosmos Semantic grew into a broad product that answers "what does it do?" with a
 1. ADLS Gen2 + Unity Catalog (storage nobody reads).
 2. Lakeflow Connect (CDC ingestion that feeds tables nobody reads).
 3. Lakehouse Federation and database-side statistics on PostgreSQL Flexible Server and Azure SQL / SQL Server.
-4. The LGPD reading over everything above.
+4. The PII reading over everything above.
 
 Plain JDBC reads are a declared blind spot. Azure Data Factory, Microsoft Fabric, Power BI and Event Hubs are out of scope.
 

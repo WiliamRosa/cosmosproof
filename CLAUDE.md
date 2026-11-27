@@ -8,5 +8,5 @@
 - No built-in cloud prices: costs come only from the customer's configured rates.
 - Never commit scan outputs (reports, ledgers, inventories): they hold owner emails and internal names.
 - Public material says "source-available", never "open source" (BSL 1.1, [ADR 0002](docs/decisions/0002-repository-license-and-cosmos-dependency.md)).
-- Shared foundation (connectors, LGPD detection) belongs in Cosmos Semantic; CosmosProof consumes released versions from PyPI.
+- Shared foundation (connectors, PII detection) belongs in Cosmos Semantic; CosmosProof consumes released versions from PyPI.
 - Record decisions as ADRs in `docs/decisions/` and keep the roadmap current.

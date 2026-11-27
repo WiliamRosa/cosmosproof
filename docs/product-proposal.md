@@ -1,4 +1,4 @@
-# Product proposal: unused data in Azure Databricks — cost, risk and LGPD
+# Product proposal: unused data in Azure Databricks — cost, risk and PII
 
 Status: accepted on 2026-11-26 as the product's founding document. Decisions taken from it live in [docs/decisions](decisions/).
 
@@ -6,7 +6,7 @@ Name: **CosmosProof** ([ADR 0001](decisions/0001-name-scope-and-promise.md)). It
 
 ## 1. Central promise
 
-> **We show, with proof, what in your Azure Databricks costs money, creates risk, or breaks the LGPD necessity principle without being used.**
+> **We show, with proof, what in your Azure Databricks costs money, creates risk, or holds PII without being used.**
 
 One map, read three ways:
 
@@ -75,10 +75,10 @@ Two rules follow from it:
 
   This optimizes cost and operational risk at the same time, and it is specific to the Databricks ecosystem.
 
-### 5.3 Compliance (LGPD)
+### 5.3 Compliance (PII)
 
-- **Personal data at rest with no purpose in use.** The LGPD necessity principle makes personal data kept without an active purpose a liability, not just a cost.
-- Cosmos already detects sensitive columns by regex (`cosmos bootstrap`, LGPD sensitivity flags). Crossing "contains CPF" with "nobody read it in 180 days" turns a FinOps report into a compliance report. In a bank, compliance has its own budget, often easier to approve than cost tooling.
+- **Personal data at rest with no purpose in use.** Personally identifiable information (PII) kept without an active purpose is a privacy liability, not just a cost.
+- Cosmos already detects sensitive columns by regex (`cosmos bootstrap`, PII flags). Crossing "contains CPF" with "nobody read it in 180 days" turns a FinOps report into a compliance report. In a bank, compliance has its own budget, often easier to approve than cost tooling.
 
 ## 6. Recurring value: the continuous loop
 
@@ -91,7 +91,7 @@ Without this it is a one-time audit: the customer runs it once, cleans up, and h
 ## 7. Delivery and architecture (high level)
 
 - **Azure Marketplace Managed Application**, the same model just published for Cosmos Semantic. It runs in the customer's subscription, with the customer's managed identity and the roles they choose. Data inventory never leaves their tenant, which is a trust argument as strong as the feature itself for a bank.
-- **Reuse from Cosmos:** PostgreSQL and SQL Server connectors, LGPD sensitivity detection, evidence model, console patterns, deployment template.
+- **Reuse from Cosmos:** PostgreSQL and SQL Server connectors, PII detection, evidence model, console patterns, deployment template.
 - **New:** outbound Azure authentication (managed identity), readers for Unity Catalog system tables and Blob Inventory, the cross-reference engine, the alert loop and the savings ledger.
 
 Permissions the customer grants:
@@ -129,7 +129,7 @@ Permissions the customer grants:
 1. **ADLS + Unity Catalog.** The storage case, with immediate value from system-table history.
 2. **Lakeflow Connect.** The wasted-compute case, the strongest money argument.
 3. **Federation + database-side statistics.** Risk and ingest-vs-federate recommendations.
-4. **LGPD reading.** Crossing sensitivity detection with usage.
+4. **PII reading.** Crossing sensitivity detection with usage.
 5. **Continuous loop** (alerts, owners, savings ledger) built in from phase 1 for the cost reading, extended to the others as they arrive.
 
 JDBC stays a declared blind spot in every phase.
@@ -137,7 +137,7 @@ JDBC stays a declared blind spot in every phase.
 ## 11. Before building: two cheap validations
 
 1. **Real test in the Databricks workspace** to confirm how federated queries (PostgreSQL, SQL Server) and plain JDBC reads appear in `system.access.table_lineage` and `system.query.history`.
-2. **Three or four conversations with bank data leaders** (natural access through the São Paulo Databricks User Group) with one question: *which of the three pains (cost, risk or LGPD) would you pay to solve?* The answer decides which reading leads the pitch.
+2. **Three or four conversations with bank data leaders** (natural access through the São Paulo Databricks User Group) with one question: *which of the three pains (cost, risk or PII) would you pay to solve?* The answer decides which reading leads the pitch.
 
 ## 12. Later, not now
 

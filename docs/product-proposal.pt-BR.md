@@ -1,4 +1,4 @@
-# Proposta de produto: dado sem uso no Azure Databricks — custo, risco e LGPD
+# Proposta de produto: dado sem uso no Azure Databricks — custo, risco e PII
 
 Status: aceita em 26/11/2026 como documento de fundação do produto. As decisões tiradas dela ficam em [docs/decisions](decisions/).
 
@@ -6,7 +6,7 @@ Nome: **CosmosProof** ([ADR 0001](decisions/0001-name-scope-and-promise.md)). É
 
 ## 1. Promessa central
 
-> **Mostramos, com prova, o que no seu Azure Databricks custa dinheiro, gera risco ou viola a necessidade da LGPD sem ser usado.**
+> **Mostramos, com prova, o que no seu Azure Databricks custa dinheiro, gera risco ou guarda PII sem ser usado.**
 
 Um mapa, três leituras:
 
@@ -75,10 +75,10 @@ Duas regras saem disso:
 
   Isso otimiza custo e risco operacional ao mesmo tempo, e é específico do ecossistema Databricks.
 
-### 5.3 Compliance (LGPD)
+### 5.3 Compliance (PII)
 
-- **Dado pessoal parado, sem finalidade em uso.** O princípio da necessidade da LGPD faz do dado pessoal guardado sem finalidade ativa um passivo, não só um custo.
-- O Cosmos já detecta colunas sensíveis por regex (`cosmos bootstrap`, sinalização de sensibilidade LGPD). Cruzar "contém CPF" com "ninguém leu nos últimos 180 dias" transforma um relatório de FinOps em relatório de compliance. Num banco, compliance tem orçamento próprio, muitas vezes mais fácil de aprovar do que ferramenta de custo.
+- **Dado pessoal parado, sem finalidade em uso.** Dado pessoal identificável (PII) guardado sem finalidade ativa é um passivo de privacidade, não só um custo.
+- O Cosmos já detecta colunas sensíveis por regex (`cosmos bootstrap`, sinalização de PII). Cruzar "contém CPF" com "ninguém leu nos últimos 180 dias" transforma um relatório de FinOps em relatório de compliance. Num banco, compliance tem orçamento próprio, muitas vezes mais fácil de aprovar do que ferramenta de custo.
 
 ## 6. Valor recorrente: o ciclo contínuo
 
@@ -91,7 +91,7 @@ Sem isso, é uma auditoria única: o cliente roda uma vez, limpa e não tem moti
 ## 7. Entrega e arquitetura (alto nível)
 
 - **Azure Marketplace Managed Application**, o mesmo modelo que acabamos de publicar para o Cosmos Semantic. Roda na assinatura do cliente, com a managed identity dele e os papéis que ele escolher. O inventário de dados nunca sai do tenant, um argumento de confiança tão forte quanto a funcionalidade em si para um banco.
-- **Reaproveitado do Cosmos:** conectores de PostgreSQL e SQL Server, detecção de sensibilidade LGPD, modelo de evidência, padrões do console, template de deploy.
+- **Reaproveitado do Cosmos:** conectores de PostgreSQL e SQL Server, detecção de PII, modelo de evidência, padrões do console, template de deploy.
 - **Novo:** autenticação de saída para o Azure (managed identity), leitores das tabelas de sistema do Unity Catalog e do Blob Inventory, o motor de cruzamento, o ciclo de alertas e o registro de economia.
 
 Permissões que o cliente concede:
@@ -129,7 +129,7 @@ Permissões que o cliente concede:
 1. **ADLS + Unity Catalog.** O caso de storage, com valor imediato pelo histórico das tabelas de sistema.
 2. **Lakeflow Connect.** O caso de computação desperdiçada, o argumento de dinheiro mais forte.
 3. **Federation + estatísticas do lado do banco.** Risco e recomendações de ingerir ou federar.
-4. **Leitura LGPD.** Cruzamento da detecção de sensibilidade com o uso.
+4. **Leitura de PII.** Cruzamento da detecção de sensibilidade com o uso.
 5. **Ciclo contínuo** (alertas, donos, registro de economia), construído desde a fase 1 para a leitura de custo e estendido às outras conforme chegam.
 
 O JDBC continua como ponto cego declarado em todas as fases.
@@ -137,7 +137,7 @@ O JDBC continua como ponto cego declarado em todas as fases.
 ## 11. Antes de construir: duas validações baratas
 
 1. **Teste real no workspace Databricks** para confirmar como consultas federadas (PostgreSQL, SQL Server) e leituras por JDBC direto aparecem em `system.access.table_lineage` e `system.query.history`.
-2. **Três ou quatro conversas com líderes de dados de bancos** (acesso natural pelo São Paulo Databricks User Group) com uma pergunta: *qual das três dores (custo, risco ou LGPD) você pagaria para resolver?* A resposta decide qual leitura lidera o discurso.
+2. **Três ou quatro conversas com líderes de dados de bancos** (acesso natural pelo São Paulo Databricks User Group) com uma pergunta: *qual das três dores (custo, risco ou PII) você pagaria para resolver?* A resposta decide qual leitura lidera o discurso.
 
 ## 12. Depois, não agora
 

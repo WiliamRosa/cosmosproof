@@ -8,7 +8,7 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 - [x] Blob Inventory reader (CSV and Parquet)
 - [x] Cross-reference engine with evidence, confidence, coverage notes and proof hash
 - [x] Storage nobody owns (orphan paths)
-- [x] LGPD reading: unused tables holding personal data (column names, from Cosmos Semantic)
+- [x] PII reading: unused tables holding personal data (column names, from Cosmos Semantic)
 - [x] Cost estimate from the customer's own rates per tier
 - [x] `diff` between runs and the realized-savings ledger
 - [x] List ADLS containers directly with Azure credentials (`list_directly`), validated on a real ADLS Gen2 account
@@ -48,5 +48,5 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 ## Before selling
 
 - [ ] Real test of how federated queries and plain JDBC reads appear in lineage
-- [ ] Three or four conversations with bank data leaders: which pain (cost, risk or LGPD) would they pay to solve?
+- [ ] Three or four conversations with bank data leaders: which pain (cost, risk or PII) would they pay to solve?
 - [ ] Legal review of the license

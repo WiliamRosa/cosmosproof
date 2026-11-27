@@ -242,7 +242,7 @@ def dashboard(schema: str) -> dict:
             "personal",
             "latest",
             "COUNT_IF(`reading` = 'compliance')",
-            "Personal data at rest (LGPD)",
+            "PII at rest",
             3,
             2,
         ),
