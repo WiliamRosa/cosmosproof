@@ -79,7 +79,7 @@ def test_without_access_tracking_confidence_is_medium():
     findings, _ = run([table("m.s.t", "t")], [blob("t/p.parquet", accessed=10)], storage=UNTRACKED)
     (f,) = findings
     assert f.confidence == "medium"
-    assert any("Last access time tracking is off" in n for n in f.coverage_notes)
+    assert any("Neither last access time tracking" in n for n in f.coverage_notes)
 
 
 def test_path_read_counts_as_table_read():

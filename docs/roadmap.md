@@ -13,6 +13,7 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 - [x] `diff` between runs and the realized-savings ledger
 - [x] List ADLS containers directly with Azure credentials (`list_directly`), validated on a real ADLS Gen2 account
 - [x] Storage-only mode when lineage is not readable ([ADR 0006](decisions/0006-storage-only-mode.md)); data files only, `_delta_log` excluded
+- [x] Storage read logs (Log Analytics) as a second storage signal with exact times, and hour windows ([ADR 0008](decisions/0008-storage-read-logs.md))
 - [ ] Read Blob Inventory reports straight from storage instead of local files
 - [ ] Join `system.query.history` as a second read signal (the SQL Query History API redacts query text, see ADR 0006)
 - [ ] Validation on an Azure Databricks workspace with ADLS external tables: storage path format confirmed on Azure (2026-11-27); lineage and a real inventory report pending an account admin grant and the first daily inventory run

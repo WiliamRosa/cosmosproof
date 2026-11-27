@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Storage read logs (`access_logs`) as a second storage signal with exact times; `window_hours`; `grants --log-analytics`.
 - Continuous monitoring: `publish:` writes runs, findings with status (new, ongoing, resolved) and run summaries; `options.auth: azure` for Databricks; config from `COSMOSPROOF_CONFIG`; Dockerfile; Container Apps Job template with Log Analytics; Databricks dashboard script.
 - `lab/`: ten scenarios of fictional data in ADLS and Unity Catalog with daily producer and consumer jobs; storage-only findings warn about cache hits.
 - Storage-only mode when `system.access` is not readable; storage reads count data files only; direct ADLS listing (`list_directly`, `azure` extra) with a clear error when the data role is missing; the summary distinguishes "no storage data" from "nothing unused".

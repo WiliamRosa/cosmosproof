@@ -26,6 +26,8 @@ class Blob:
     tier: str | None
     last_modified: datetime | None
     last_access: datetime | None
+    # Last read seen in Azure Storage resource logs, when configured.
+    log_read: datetime | None = None
 
 
 def container_url(account: str, container: str) -> str:

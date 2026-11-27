@@ -22,6 +22,11 @@ from cosmosproof.unity_catalog import LINEAGE_HISTORY_DAYS, CatalogSnapshot, Tab
 LINEAGE = "system.access.table_lineage"
 INFO_SCHEMA = "system.information_schema"
 INVENTORY = "Azure Blob Inventory"
+LOGS = "Azure Storage resource logs"
+LOGS_NOTE = (
+    "Storage read logs record every read of a data file, by Databricks or any other tool; "
+    "platform maintenance that reads files (for example OPTIMIZE) counts as a read too."
+)
 GB = 1024**3
 # Early-deletion periods per access tier (days), so a recommendation never costs more than it saves.
 MIN_RETENTION = {"cool": 30, "cold": 90, "archive": 180}
@@ -83,6 +88,10 @@ class _Group:
         values = [_utc(b.last_access) for b in self.blobs if b.last_access and not _is_log(b.url)]
         return max(values) if values else None
 
+    def last_log_read(self) -> datetime | None:
+        values = [_utc(b.log_read) for b in self.blobs if b.log_read and not _is_log(b.url)]
+        return max(values) if values else None
+
     def has_delta_log(self) -> bool:
         return any(_is_log(b.url) for b in self.blobs)
 
@@ -109,6 +118,8 @@ class Analyzer:
         orphan_depth: int = 2,
         producers: ProducerActivity | None = None,
         price_discount: float = 0.0,
+        window_hours: float | None = None,
+        now: datetime | None = None,
     ) -> None:
         self.snapshot = snapshot
         self.storages = blobs_by_storage
@@ -118,10 +129,16 @@ class Analyzer:
         self.orphan_depth = orphan_depth
         self.producers = producers
         self.price_discount = price_discount
-        self.end = datetime.combine(reference, time.max, tzinfo=UTC)
-        self.cutoff = datetime.combine(
-            reference - timedelta(days=window_days), time.min, tzinfo=UTC
-        )
+        self.window_hours = window_hours
+        if window_hours:
+            self.end = _utc(now) or datetime.now(UTC)
+            self.cutoff = self.end - timedelta(hours=window_hours)
+            self.window_days = round(window_hours / 24, 4)
+        else:
+            self.end = datetime.combine(reference, time.max, tzinfo=UTC)
+            self.cutoff = datetime.combine(
+                reference - timedelta(days=window_days), time.min, tzinfo=UTC
+            )
         self.notes: list[str] = []
 
     # --- public -------------------------------------------------------------------------
@@ -195,6 +212,17 @@ class Analyzer:
                 "start; reads before that date cannot be seen."
             )
 
+    def _window_label(self) -> str:
+        return f"{self.window_hours:g}-hour" if self.window_hours else f"{self.window_days}-day"
+
+    def _span_label(self) -> str:
+        return f"{self.window_hours:g} hours" if self.window_hours else f"{self.window_days} days"
+
+    def _logs_cover_window(self, storage: StorageConfig | None) -> bool:
+        return bool(
+            storage and storage.access_logs and _utc(storage.access_logs.since) <= self.cutoff
+        )
+
     def _access_covers_window(self, storage: StorageConfig | None) -> bool:
         return bool(
             storage
@@ -225,34 +253,56 @@ class Analyzer:
                 observed_at=group.last_modified(),
             )
         ]
-        if not self._access_covers_window(group.storage):
+        tracking = self._access_covers_window(group.storage)
+        logs = self._logs_cover_window(group.storage)
+        if not tracking and not logs:
             notes.append(
-                "Last access time tracking is off or was enabled after the window start, so "
-                "storage reads cannot confirm or refute the lineage signal."
+                "Neither last access time tracking nor storage read logs cover the whole window, "
+                "so storage reads cannot confirm or refute the lineage signal."
             )
             return evidence, "unknown"
         if group.has_delta_log():
             notes.append(DATA_FILES_ONLY)
-        last = group.last_access()
+        if logs:
+            notes.append(LOGS_NOTE)
+        last = group.last_access() if tracking else None
+        logged = group.last_log_read() if logs else None
         if last and last >= self.cutoff:
             evidence.append(
                 Evidence(source=INVENTORY, signal="file read inside the window", observed_at=last)
             )
             return evidence, "read"
-        evidence.append(
-            Evidence(
-                source=INVENTORY,
-                signal=(
-                    "no file read inside the window"
-                    + (
-                        f"; last read {last.date().isoformat()}"
-                        if last
-                        else "; never read since tracking began"
-                    )
-                ),
-                observed_at=last,
+        if logged and logged >= self.cutoff:
+            evidence.append(
+                Evidence(source=LOGS, signal="data file read inside the window", observed_at=logged)
             )
-        )
+            return evidence, "read"
+        if tracking:
+            evidence.append(
+                Evidence(
+                    source=INVENTORY,
+                    signal=(
+                        "no file read inside the window"
+                        + (
+                            f"; last read {last.date().isoformat()}"
+                            if last
+                            else "; never read since tracking began"
+                        )
+                    ),
+                    observed_at=last,
+                )
+            )
+        if logs:
+            evidence.append(
+                Evidence(
+                    source=LOGS,
+                    signal=(
+                        "no data file read in the storage read logs inside the window"
+                        + (f"; last logged read {logged.isoformat()}" if logged else "")
+                    ),
+                    observed_at=logged,
+                )
+            )
         return evidence, "silent"
 
     def _tier_advice(self, group: _Group) -> str:
@@ -290,7 +340,7 @@ class Analyzer:
                 Evidence(
                     source=LINEAGE,
                     signal=(
-                        f"no read inside the {self.window_days}-day window; last read "
+                        f"no read inside the {self._window_label()} window; last read "
                         f"{last_read.date().isoformat()}"
                         if last_read
                         else "no read recorded in the lineage history"
@@ -572,7 +622,7 @@ class Analyzer:
                     Evidence(
                         source="system.billing.usage",
                         signal=(
-                            f"{cost.quantity:,.2f}{unit} in the last {self.window_days} days, "
+                            f"{cost.quantity:,.2f}{unit} in the last {self._span_label()}, "
                             f"{cost.amount:,.2f} {cost.currency} at list price"
                         ),
                     )

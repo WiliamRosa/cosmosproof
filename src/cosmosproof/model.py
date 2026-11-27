@@ -34,7 +34,7 @@ class Finding(BaseModel):
     coverage_notes: list[str] = []
     recommendation: str
     details: dict[str, Any] = {}
-    window_days: int
+    window_days: float
     reference_date: date
     proof_hash: str = ""
 
@@ -50,7 +50,7 @@ class Report(BaseModel):
     tool_version: str
     generated_at: datetime
     reference_date: date
-    window_days: int
+    window_days: float
     findings: list[Finding]
     coverage_notes: list[str] = []
     storage_files: int = Field(0, description="Files read from inventories or listings.")
