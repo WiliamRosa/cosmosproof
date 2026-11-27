@@ -24,6 +24,8 @@ class TableInfo:
     data_source_format: str | None
     created: datetime | None
     columns: list[str] = field(default_factory=list)
+    # Excluded from findings, but still the owner of its storage (so it is never an orphan).
+    ignored: bool = False
 
 
 @dataclass

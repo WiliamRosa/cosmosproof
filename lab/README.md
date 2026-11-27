@@ -58,3 +58,19 @@ Then delete the two jobs and the `lab/` folder in the container (external tables
 ```bash
 az storage fs directory delete --account-name <account> -f <container> -n lab --auth-mode login --yes
 ```
+
+## Validated on 2026-11-27 (same day, storage-only mode with read logs)
+
+Deployed, jobs run at 12:40 UTC, storage read logs on since 12:37 UTC, scanned with `window_hours` starting after both, from a laptop and again from the scheduled Container Apps Job with its managed identity. Both runs gave the same 10 findings:
+
+| # | Result |
+|---|---|
+| S1, S4, S6 | No finding, as expected (S4 read by the producer that builds a used gold table; S6 read by path) |
+| S2, S9 | Unused table + LGPD finding each, medium |
+| S3 | Unused table, medium (the producer only reads `_delta_log` when appending) |
+| S5 | Orphan path, medium; judged apart from S6 next to it because orphans are grouped by Delta table root |
+| S7 | Unused table, medium, data files in Cool |
+| S8 | Unused managed table, medium |
+| S10 | Unused table (the documented `COUNT(*)` false positive) |
+
+Every read in the logs came from the Databricks access connector identity, which is how storage-only mode sees Databricks use without lineage.

@@ -182,3 +182,21 @@ def test_chain_of_dead_producers():
         ("unused_table", "m.s.t1"),
         ("unused_table", "m.s.t2"),
     ]
+
+
+def test_excluded_catalog_still_owns_its_storage():
+    ignored = table("other.s.t", "t")
+    ignored.ignored = True
+    findings, _ = run([ignored], [blob("t/p.parquet", accessed=300)])
+    assert findings == []  # neither a table finding nor an orphan path
+
+
+def test_orphan_delta_tables_side_by_side_are_judged_separately():
+    blobs = [
+        blob("lab/exports/a/part-0.parquet", accessed=400, modified=700),
+        blob("lab/exports/a/_delta_log/0.json", accessed=400, modified=700),
+        blob("lab/exports/b/part-0.parquet", accessed=1, modified=700),
+        blob("lab/exports/b/_delta_log/0.json", accessed=1, modified=700),
+    ]
+    findings, _ = run([], blobs)
+    assert [f.asset for f in findings] == [f"{LOC}/lab/exports/a"]
