@@ -90,3 +90,18 @@ def test_example_config_loads(monkeypatch):
     config = load_config(Path(__file__).parent.parent / "examples" / "cosmosproof.yml")
     assert config.databricks.producers is True
     assert config.storage[0].account == "mydatalake"
+
+
+def test_lab_sql_splits_into_statements():
+    import importlib.util
+    from pathlib import Path
+
+    lab = Path(__file__).parent.parent / "lab"
+    spec = importlib.util.spec_from_file_location("lab_deploy", lab / "deploy.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    setup = module.statements((lab / "setup.sql").read_text(encoding="utf-8"))
+    assert setup[0].startswith("CREATE CATALOG IF NOT EXISTS cosmosproof_lab")
+    assert sum(st.startswith("DROP TABLE") for st in setup) == 2
+    consumer = module.statements((lab / "consumer.sql").read_text(encoding="utf-8"))
+    assert consumer[0] == "SET use_cached_result = false"

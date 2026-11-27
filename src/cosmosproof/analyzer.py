@@ -28,7 +28,8 @@ MIN_RETENTION = {"cool": 30, "cold": 90, "archive": 180}
 
 LINEAGE_MISSING = (
     "Lineage is unavailable (reading system.access needs a grant from a Databricks account "
-    "admin), so this verdict rests on storage reads alone."
+    "admin), so this verdict rests on storage reads alone. Queries answered by the Databricks "
+    "SQL result cache or disk cache do not read storage and are invisible here."
 )
 DATA_FILES_ONLY = (
     "Only data files count as reads: Delta writers also read _delta_log, and a query answered "

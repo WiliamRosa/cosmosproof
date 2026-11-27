@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `lab/`: ten scenarios of fictional data in ADLS and Unity Catalog with daily producer and consumer jobs; storage-only findings warn about cache hits.
 - Storage-only mode when `system.access` is not readable; storage reads count data files only; direct ADLS listing (`list_directly`, `azure` extra) with a clear error when the data role is missing; the summary distinguishes "no storage data" from "nothing unused".
 - `scan` explains missing system table grants instead of failing with a stack trace; the generated onboarding says system catalog grants need a Databricks account admin (found on a real Azure tenant).
 - `cosmosproof grants`: prints the onboarding grants and commands for a person to review; `databricks.list_price_discount` applies a contract discount to list prices; Parquet inventory timestamps (epoch milliseconds) are read correctly.

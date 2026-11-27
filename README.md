@@ -82,6 +82,7 @@ If storage shows a read inside the window, there is no finding, even when lineag
 
 ## Documentation
 
+- [Lab](lab/README.md): fictional data and daily jobs covering every scenario, to deploy on your own workspace
 - [Product proposal](docs/product-proposal.md) ([pt-BR](docs/product-proposal.pt-BR.md))
 - [Roadmap](docs/roadmap.md)
 - [Decisions](docs/decisions/)
