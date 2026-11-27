@@ -40,7 +40,11 @@ def to_markdown(report: Report) -> str:
         f"(cost {totals['by_reading']['cost']}, risk {totals['by_reading']['risk']}, "
         f"compliance {totals['by_reading']['compliance']})",
         "- Unused storage: "
-        + (_size(totals["unused_bytes"]) if totals["unused_bytes"] else "unknown (no inventory)"),
+        + (
+            _size(totals["unused_bytes"])
+            if report.storage_files
+            else "unknown (no inventory or listing)"
+        ),
     ]
     for currency, value in totals["monthly_cost"].items():
         lines.append(f"- Estimated monthly cost (storage and compute): {value:.2f} {currency}")

@@ -13,12 +13,11 @@ from cosmosproof.config import ScanConfig
 from cosmosproof.inventory import read_inventory
 from cosmosproof.model import Report
 from cosmosproof.producers import ProducerActivity, read_producers
-from cosmosproof.unity_catalog import CatalogSnapshot, read_catalog
+from cosmosproof.unity_catalog import CatalogSnapshot, is_permission_error, read_catalog
 
 MISSING_GRANTS = (
-    "The scanning identity cannot read the Unity Catalog system tables (system.access). "
-    "Only a Databricks account admin can grant them; workspace and metastore admins cannot. "
-    "Run `cosmosproof grants` and have an account admin run the SQL section."
+    "The scanning identity cannot read the Unity Catalog metadata "
+    "(system.information_schema). Give it BROWSE on the catalogs to scan (`cosmosproof grants`)."
 )
 
 
@@ -43,10 +42,10 @@ def run_scan(
         try:
             snapshot: CatalogSnapshot = read_catalog(con, names, reference)
         except ConnectorError as exc:
-            if "INSUFFICIENT_PERMISSIONS" in str(exc) or "PERMISSION_DENIED" in str(exc):
+            if is_permission_error(exc):
                 raise ScanError(MISSING_GRANTS) from exc
             raise
-        if config.databricks.producers:
+        if config.databricks.producers and snapshot.activity.lineage_available:
             try:
                 producers = read_producers(con, names, reference, config.window_days)
                 producer_notes = producers.notes
@@ -60,7 +59,24 @@ def run_scan(
     storages = []
     for storage in config.storage:
         path = (inventories or {}).get((storage.account, storage.container)) or storage.inventory
-        blobs = read_inventory(path, storage.account, storage.container) if path else []
+        if path:
+            blobs = read_inventory(path, storage.account, storage.container)
+        elif storage.list_directly:
+            from cosmosproof.listing import list_container
+
+            try:
+                blobs = list_container(storage.account, storage.container)
+            except Exception as exc:  # azure.core errors; the SDK is an optional extra
+                text = str(exc)
+                if "AuthorizationPermissionMismatch" in text or "AuthorizationFailure" in text:
+                    raise ScanError(
+                        f"The scanning identity cannot list {storage.account}/{storage.container}: "
+                        "it needs Storage Blob Data Reader on the account (`cosmosproof grants`). "
+                        "Owner or Contributor alone do not give access to data."
+                    ) from exc
+                raise
+        else:
+            blobs = []
         storages.append((storage, blobs))
     analyzer = Analyzer(
         snapshot,
@@ -75,7 +91,9 @@ def run_scan(
     findings = analyzer.run()
     notes = [*analyzer.notes, *producer_notes]
     if not config.storage:
-        notes.append("No ADLS inventory was given: sizes, costs and storage reads are unknown.")
+        notes.append(
+            "No ADLS inventory or listing was given: sizes, costs and storage reads are unknown."
+        )
     return Report(
         tool_version=__version__,
         generated_at=datetime.now(UTC),
@@ -83,4 +101,5 @@ def run_scan(
         window_days=config.window_days,
         findings=findings,
         coverage_notes=notes,
+        storage_files=sum(len(blobs) for _, blobs in storages),
     )

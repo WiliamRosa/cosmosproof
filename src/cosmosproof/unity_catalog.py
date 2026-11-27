@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
 from cosmos_semantic.connectors import Connector
+from cosmos_semantic.errors import ConnectorError
 
 from cosmosproof.config import SystemTables
 
@@ -34,12 +35,20 @@ class Activity:
     table_writes: dict[str, datetime] = field(default_factory=dict)
     path_reads: dict[str, datetime] = field(default_factory=dict)
     earliest_event: datetime | None = None
+    # False when the identity cannot read system.access (no account admin grant): the scan
+    # then relies on storage signals only.
+    lineage_available: bool = True
 
 
 @dataclass
 class CatalogSnapshot:
     tables: list[TableInfo]
     activity: Activity
+
+
+def is_permission_error(exc: Exception) -> bool:
+    text = str(exc)
+    return "INSUFFICIENT_PERMISSIONS" in text or "PERMISSION_DENIED" in text
 
 
 def _lit(value: date) -> str:
@@ -99,7 +108,14 @@ def read_catalog(con: Connector, names: SystemTables, reference: date) -> Catalo
             tables[name].columns.append(row["column_name"])
 
     activity = Activity()
-    for row in con.execute(reads_sql).to_pylist():
+    try:
+        reads = con.execute(reads_sql).to_pylist()
+    except ConnectorError as exc:
+        if not is_permission_error(exc):
+            raise
+        activity.lineage_available = False
+        return CatalogSnapshot(tables=list(tables.values()), activity=activity)
+    for row in reads:
         activity.table_reads[row["name"]] = row["last_event"]
         activity.table_read_counts[row["name"]] = int(row["events"])
     for row in con.execute(writes_sql).to_pylist():
