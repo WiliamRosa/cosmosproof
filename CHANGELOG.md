@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The scanner image is public; the Marketplace package was test-deployed with the full customer journey.
 - Risk reading: unused Lakehouse Federation connections (`unused_connection`), with ingestion pipelines that use a connection excluded.
 - Azure Marketplace Managed Application package (`deploy/azure/marketplace`), with certification checks as tests.
 - Storage read logs (`access_logs`) as a second storage signal with exact times; `window_hours`; `grants --log-analytics`.

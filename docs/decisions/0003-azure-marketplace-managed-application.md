@@ -42,3 +42,5 @@ Tested on an Azure Databricks Premium workspace with Unity Catalog and an ADLS G
 ## 2026-11-27 update: package
 
 The Managed Application package lives in `deploy/azure/marketplace/`. It creates the identity, a Log Analytics workspace, a reports storage account (the identity's only write role, scoped to its container) and the daily Container Apps Job, and outputs the identity's IDs for the grants. The scanner image is published to GitHub Container Registry and must be made public before the package can deploy: Container Apps rejects a private image at deployment time.
+
+Validated on 2026-11-27 with the public image: the package deployed into an empty resource group, and the customer journey worked end to end. The grants printed by `cosmosproof grants` for the new identity were applied (Storage Blob Data Reader, Databricks service principal with SQL access, `CAN USE` on the warehouse, `BROWSE` on a catalog), then the package's own job ran and published to the package's own reports account. The test resource group and grants were removed afterwards.
