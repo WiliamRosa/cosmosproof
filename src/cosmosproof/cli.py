@@ -145,6 +145,58 @@ def grants(
     )
 
 
+def _audit_config(config: Path | None):
+    import os
+
+    from cosmosproof.audit import parse_audit_config
+
+    if config is not None:
+        return parse_audit_config(config.read_text(encoding="utf-8"))
+    if os.environ.get("COSMOSPROOF_CONFIG"):
+        return parse_audit_config(os.environ["COSMOSPROOF_CONFIG"])
+    raise typer.BadParameter("give --config or set COSMOSPROOF_CONFIG")
+
+
+@app.command()
+def discover(
+    config: Path | None = typer.Option(None, "--config", "-c", help="Audit configuration."),
+) -> None:
+    """List the workspaces and ADLS accounts in scope, with the suggested selection."""
+    from cosmosproof.audit import discover as run_discovery
+    from cosmosproof.publish import target_for
+
+    settings = _audit_config(config)
+    resources, selection = run_discovery(settings, target_for(settings.location))
+    chosen = selection["resources"]
+    for r in resources:
+        mark = "x" if chosen.get(r.id, {}).get("selected") else " "
+        extra = (
+            f" [{r.status}{': ' + r.error[:80] if r.error else ''}]"
+            if r.kind == "workspace"
+            else ""
+        )
+        typer.echo(
+            f"[{mark}] {r.kind:9} {r.name:30} {r.environment:8} ({r.environment_source}) "
+            f"{r.subscription}/{r.resource_group}{extra}"
+        )
+
+
+@app.command()
+def audit(
+    config: Path | None = typer.Option(None, "--config", "-c", help="Audit configuration."),
+) -> None:
+    """Discover, scan every selected resource and update cosmosproof.audit and its model."""
+    from cosmosproof.audit import run_audit
+
+    summary = run_audit(_audit_config(config))
+    kpis = summary["kpis"]
+    typer.echo(
+        f"run {summary['run_id']}: {summary['scanned']} scanned, {summary['failed']} failed; "
+        f"{summary['new']} new, {summary['ongoing']} ongoing, {summary['resolved']} resolved; "
+        f"{kpis.get('open_findings', 0)} open findings"
+    )
+
+
 @app.command("diff")
 def diff_cmd(previous: Path, current: Path) -> None:
     """Compare two reports: new findings are alerts, resolved ones go to the ledger."""

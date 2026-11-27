@@ -24,6 +24,12 @@ class Target(Protocol):
     def read(self, name: str) -> str | None: ...
     def write(self, name: str, text: str) -> None: ...
     def list(self, prefix: str) -> list[str]: ...
+    def download(self, name: str, local: Path) -> str | None: ...
+    def upload(self, name: str, local: Path, etag: str | None) -> None: ...
+
+
+class ConcurrentUpdateError(Exception):
+    """Another writer changed the file since it was read."""
 
 
 class LocalTarget:
@@ -44,6 +50,28 @@ class LocalTarget:
         if not base.exists():
             return []
         return sorted(p.relative_to(self.root).as_posix() for p in base.rglob("*") if p.is_file())
+
+    def _etag(self, path: Path) -> str:
+        # A version counter, not the modification time: two writes in a row can share it.
+        version = path.with_name(path.name + ".version")
+        return version.read_text() if version.exists() else "0"
+
+    def download(self, name: str, local: Path) -> str | None:
+        source = self.root / name
+        if not source.exists():
+            return None
+        local.write_bytes(source.read_bytes())
+        return self._etag(source)
+
+    def upload(self, name: str, local: Path, etag: str | None) -> None:
+        target = self.root / name
+        current = self._etag(target) if target.exists() else None
+        if current != etag:
+            raise ConcurrentUpdateError(name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(local.read_bytes())
+        version = target.with_name(target.name + ".version")
+        version.write_text(str(int(current or "0") + 1))
 
 
 class AdlsTarget:
@@ -77,6 +105,37 @@ class AdlsTarget:
 
     def write(self, name: str, text: str) -> None:
         self.client.upload_blob(self._key(name), text.encode("utf-8"), overwrite=True)
+
+    def download(self, name: str, local: Path) -> str | None:
+        from azure.core.exceptions import ResourceNotFoundError
+
+        try:
+            blob = self.client.download_blob(self._key(name))
+        except ResourceNotFoundError:
+            return None
+        local.write_bytes(blob.readall())
+        return blob.properties.etag
+
+    def upload(self, name: str, local: Path, etag: str | None) -> None:
+        """Only replaces the blob version that was downloaded, so two writers never overwrite
+        each other; a new blob is only created if none exists."""
+        from azure.core import MatchConditions
+        from azure.core.exceptions import ResourceExistsError, ResourceModifiedError
+
+        data = local.read_bytes()
+        try:
+            if etag is None:
+                self.client.upload_blob(self._key(name), data, overwrite=False)
+            else:
+                self.client.upload_blob(
+                    self._key(name),
+                    data,
+                    overwrite=True,
+                    etag=etag,
+                    match_condition=MatchConditions.IfNotModified,
+                )
+        except (ResourceExistsError, ResourceModifiedError) as exc:
+            raise ConcurrentUpdateError(name) from exc
 
     def list(self, prefix: str) -> list[str]:
         start = len(self.prefix) + 1 if self.prefix else 0

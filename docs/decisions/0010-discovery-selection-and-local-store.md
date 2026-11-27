@@ -1,6 +1,6 @@
 # ADR 0010: Discovery, resource selection for non-technical users, and a local store
 
-- **Status:** proposed
+- **Status:** accepted (2026-11-27, with the decisions below)
 - **Date:** 2026-11-27
 
 ## Context
@@ -17,7 +17,7 @@ A bank deploys CosmosProof once and its identity can reach many Azure Databricks
 
 ### 2. Selection, in a web UI
 
-The product ships a small web app (Container App in the managed resource group, sign-in with Microsoft Entra ID, Portuguese and English), with three screens:
+The product ships a small web app (a Databricks App, see the decisions below; Portuguese and English), with three screens:
 
 1. **What we found:** cards per workspace with an environment badge, the ADLS accounts it uses beneath it, and a switch to analyze it or not. Bulk actions: "leave out everything marked development or POC".
 2. **Connections:** for each selected resource, a status in plain language (*ready*, *missing access*), and for what is missing a single consolidated script for the administrators to run, grouped by who must run it (Azure administrator, Databricks workspace administrator).
@@ -31,7 +31,7 @@ The scheduled job scans every selected workspace and storage account. One failin
 
 ### 4. A local store: DuckDB
 
-- The scanner keeps **`cosmosproof.duckdb`** in the reports storage: resources discovered, selections, runs, findings with status, evidence, per-resource metrics (tables, files, bytes, signal coverage) and scan events. The scanner is its only writer and uses an ETag on upload, so two runs can never overwrite each other.
+- The scanner keeps **`cosmosproof.audit`** (a DuckDB database file) in the reports storage: resources discovered, selections, runs, findings with status, evidence, per-resource metrics (tables, files, bytes, signal coverage) and scan events. The scanner is its only writer and uses an ETag on upload, so two runs can never overwrite each other.
 - The UI reads a copy; it never writes to the database.
 - After each run the store is **exported to Parquet** (`model/findings`, `model/resources`, `model/runs`, `model/resource_metrics`) in the reports storage. That is the interface for BI:
   - **Databricks:** an external location over it, views and the AI/BI dashboard (`deploy/databricks/dashboard.py`, adapted to the model).
@@ -50,7 +50,17 @@ The Connections screen generates these for exactly the selected resources.
 
 ## Consequences
 
-- The Managed Application gains a web app and needs an Entra ID app registration for sign-in; the deployment cannot create one, so the customer's administrator creates it (a printed script) and gives its ID in the wizard.
 - Reader on subscriptions is broader than today's grants; it is read-only and limited to metadata, and the scope is the customer's choice.
 - The scanner becomes multi-tenant across workspaces in one customer; per-workspace tokens come from the same managed identity.
 - The Marketplace offer waits for this, because selection and the Results screen are what non-technical buyers will judge.
+
+## Decisions taken on 2026-11-27
+
+- **Store name:** `cosmosproof.audit`.
+- **Discovery scope:** the customer chooses subscriptions or a management group; both are offered.
+- **The web UI is a Databricks App, not a Container App.** A Container App needs a Microsoft Entra ID app registration for sign-in, which a bank will not create for a new vendor. A Databricks App signs users in with the workspace's existing Entra ID single sign-on, gets its own service principal from the platform, and can act with the signed-in user's token, so Unity Catalog permissions decide who sees which findings. The customer picks one "home" workspace for it; a workspace administrator installs it once after the Marketplace deployment. Databricks Apps availability varies by Azure region and must be checked per customer; where it is missing, results stay available through the Databricks dashboard and Power BI.
+- **The scanner stays on Azure** (Container Apps Job with a managed identity): it is the component that needs Azure credentials for Resource Graph discovery and storage listing. The UI and the scanner meet in the reports storage: the scanner writes `cosmosproof.audit` and its Parquet export, the UI writes the selection file.
+- The Marketplace offer waits for this work.
+- **The metric model in `cosmosproof.audit` is the product's core output.** Dimensions (`dim_resource`, `dim_run`), facts (`fact_finding`, `fact_resource_scan`), an `event_log` and ready-made metric views (`v_kpis`, `v_cost_by_owner`, `v_cost_by_resource`, `v_trend`, `v_pii_at_rest`, `v_resource_health`). The app reads and plots it; a Databricks dashboard or Power BI over the Parquet export is the customer's option, not a requirement.
+
+Validated live on 2026-11-27: discovery through Resource Graph found the workspace and both ADLS accounts, suggested `dev` for the account tagged `environment=dev` and left it unselected; a full audit cycle scanned the selected workspace, wrote `cosmosproof.audit` and the eleven Parquet files to the reports storage, and the views returned the expected KPIs.

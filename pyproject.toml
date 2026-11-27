@@ -21,6 +21,7 @@ dependencies = [
     "cosmos-semantic>=0.5,<0.6",
     "pydantic>=2.9",
     "pyyaml>=6.0",
+    "duckdb>=1.2",
     "pyarrow>=17.0",
     "typer>=0.15",
 ]
