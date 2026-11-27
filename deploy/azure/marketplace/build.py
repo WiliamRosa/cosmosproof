@@ -31,8 +31,16 @@ def packaged_template(template: str, pid: str | None) -> str:
         return template
     if not GUID.match(pid):
         raise SystemExit(f"--pid must be a GUID, got {pid!r}")
+    pid = pid.lower()
     data = json.loads(template)
-    data["parameters"]["partnerCenterPid"]["defaultValue"] = pid.lower()
+    data["parameters"]["partnerCenterPid"]["defaultValue"] = pid
+    # Partner Center only recognizes the attribution deployment by its literal name: with an
+    # expression it reports "deployments used for purposes other than customer usage attribution"
+    # and refuses the package.
+    for resource in data["resources"]:
+        if resource["type"] == "Microsoft.Resources/deployments":
+            resource["name"] = f"pid-{pid}-partnercenter"
+            resource.pop("condition", None)
     return json.dumps(data, indent=2) + "\n"
 
 
