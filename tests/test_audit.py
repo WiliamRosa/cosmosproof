@@ -86,3 +86,15 @@ def test_concurrent_writers_are_refused(tmp_path):
     else:
         raise AssertionError("an outdated writer must be refused")
     assert json.loads(json.dumps({"ok": True}))["ok"]
+
+
+def test_old_suggestions_are_recomputed_but_choices_are_not():
+    current = {
+        "resources": {
+            "/sa/acct2": {"selected": True, "by": "suggestion"},  # rule changed since
+            "/ws/dev": {"selected": True, "by": "maria"},
+        }
+    }
+    merged = merge_selection([DEV, SA2], current)["resources"]
+    assert merged["/sa/acct2"]["selected"] is False
+    assert merged["/ws/dev"] == {"selected": True, "by": "maria"}

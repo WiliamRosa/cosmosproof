@@ -136,3 +136,22 @@ def test_metric_views_have_one_row_per_owner_and_bi_friendly_types(tmp_path):
         assert len(owners) == len(set(owners))
         types = dict(store.con.execute("DESCRIBE v_kpis").fetchall()[i][:2] for i in range(10))
         assert types["unused_bytes"] == "BIGINT"
+
+
+def test_workspace_managed_storage_follows_its_workspace_and_starts_unselected():
+    rows = [
+        {"id": WS + "wkp-prd", "name": "wkp-prd", "type": "microsoft.databricks/workspaces",
+         "resourceGroup": "rg", "subscriptionId": "s", "location": "l", "tags": {},
+         "workspaceUrl": "adb-1.1.azuredatabricks.net",
+         "managedResourceGroup": "/subscriptions/s/resourceGroups/RG-PRD-MANAGED"},
+        {"id": "/x/dbstorageabc", "name": "dbstorageabc", "type": "microsoft.storage/storageaccounts",
+         "resourceGroup": "rg-prd-managed", "subscriptionId": "s", "location": "l", "tags": {},
+         "workspaceUrl": "", "managedResourceGroup": ""},
+    ]  # fmt: skip
+    storage = next(r for r in parse_graph_rows(rows) if r.kind == "storage")
+    assert (storage.managed_by, storage.environment, storage.environment_source) == (
+        "wkp-prd",
+        "prod",
+        "workspace",
+    )
+    assert not selected_by_default(storage)
