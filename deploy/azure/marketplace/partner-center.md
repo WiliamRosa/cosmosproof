@@ -1,12 +1,13 @@
 # Creating the offer in Partner Center
 
-Step by step for the CosmosProof offer, under the same publisher as Cosmos Semantic (Cosmos Data). The texts to paste are in [listing.md](listing.md); the plans come from the [pricing proposal](pricing-proposal.md) once decided.
+Step by step for the CosmosProof offer, under the same publisher as Cosmos Semantic (Cosmos Data). The texts to paste are in [listing.md](listing.md); the plans and prices are in [pricing-proposal.md](pricing-proposal.md) (decided).
 
 ## Before starting
 
 - [ ] The product page, privacy policy and terms are live: https://cosmosdata.ai/proof/, https://cosmosdata.ai/proof/privacy and https://cosmosdata.ai/proof/terms.
 - [ ] The image `ghcr.io/wiliamrosa/cosmosproof:0.1.0` is public (Container Apps pulls it at deployment time).
-- [ ] Plans and prices decided.
+- [ ] The account has a valid **payout and tax profile** (gear icon → Account settings → Payout and tax). Without it, Partner Center refuses to save a paid plan's price ("This account is not publish eligible due to either an invalid payout, payout on hold, or invalid tax"); free plans save normally.
+- [x] Plans and prices decided: Evaluation (free, non-production), Starter US$ 490/month, Business US$ 1,490/month, Enterprise by private offer.
 
 ## 1. New offer
 
@@ -46,16 +47,17 @@ One plan per row of the pricing table, for example plan ID `starter`, then `busi
 3. **Pricing and availability:** markets (start with Brazil and United States; add more later), price per month (and per year if offered), visibility public (or private with tenant IDs for the evaluation plan).
 4. **Technical configuration:**
    - Version: `0.1.0`.
-   - Customer usage attribution ID: Partner Center shows one GUID for the plan. Copy it and build the package with it:
+   - Customer usage attribution ID: Partner Center shows `pid-<GUID>-partnercenter`, where the GUID is the offer's own (the same for every plan; for `cosmosproof` it is `e95b41bb-895b-476c-947d-ce5b759988fc`). Build the package with it:
 
      ```bash
      python deploy/azure/marketplace/build.py --pid <GUID>
      ```
 
-     The zip changes only in the parameter default, so the same build can be uploaded to every plan; if each plan shows a different GUID, build once per plan before uploading.
+     The packaged template gets the attribution deployment with that **literal** name and no condition. With the name as an expression, Partner Center reports "Microsoft.Resources/deployments for purposes other than customer usage attribution" and refuses the package. The same zip serves every plan.
    - Package file: `deploy/azure/marketplace/cosmosproof-managed-app.zip`.
    - Deployment mode: **Incremental**.
-   - Publisher management access: **not allowed**, if the option is offered. CosmosProof is designed so the publisher never needs access to the customer's deployment. If Partner Center requires an authorization, give only the **Reader** role to a dedicated Entra group in the publisher tenant, and say so in the terms.
+   - Publisher management: **Disable management access**. CosmosProof is designed so the publisher never needs access to the customer's deployment.
+   - Customer access: **Enable full access**, so the customer can run the job by hand and read its logs in the managed resource group (no billing meters to protect).
    - Customer actions, policies and the notification endpoint: leave empty.
 
 ## 7. Review and publish
