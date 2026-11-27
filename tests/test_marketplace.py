@@ -49,3 +49,22 @@ def test_template_attribution_and_read_only_roles():
     # The only role the template grants is a data writer on its own reports container.
     assert template.count("Microsoft.Authorization/roleAssignments") == 1
     assert "scope: reportsContainerResource" in template
+
+
+def test_packaged_template_carries_the_attribution_pid():
+    import importlib.util
+
+    import pytest
+
+    spec = importlib.util.spec_from_file_location("build", HERE / "build.py")
+    build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build)
+    template = (HERE / "mainTemplate.json").read_text(encoding="utf-8")
+    pid = "0F8C1A2B-1111-4222-8333-944455556666"
+    packaged = json.loads(build.packaged_template(template, pid))
+    assert packaged["parameters"]["partnerCenterPid"]["defaultValue"] == pid.lower()
+    # The committed template stays without attribution.
+    assert json.loads(template)["parameters"]["partnerCenterPid"]["defaultValue"] == ""
+    assert build.packaged_template(template, None) == template
+    with pytest.raises(SystemExit):
+        build.packaged_template(template, "not-a-guid")
