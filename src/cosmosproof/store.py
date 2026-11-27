@@ -239,6 +239,7 @@ class AuditStore:
         findings: list[tuple[str, Finding]],
         resources_scanned: int,
         resources_failed: int,
+        judged: set[str] | None = None,
     ) -> dict[str, int]:
         """Stores the findings of a run (each with the workspace it came from), marks them new
         or ongoing against the previous run, and adds the resolved ones."""
@@ -253,6 +254,19 @@ class AuditStore:
             counts[status] += 1
             self._insert_finding(run_id, resource_id, f, status)
         for fid, old in previous.items():
+            if fid in seen:
+                continue
+            if judged is not None and old["resource_id"] not in judged:
+                # Not verified this run (failed, or nothing visible): keep it open.
+                seen.add(fid)
+                counts["ongoing"] += 1
+                self.con.execute(
+                    "INSERT INTO fact_finding SELECT ? AS run_id, * EXCLUDE (run_id) "
+                    "REPLACE ('ongoing' AS status) FROM fact_finding "
+                    "WHERE run_id = ? AND finding_id = ?",
+                    [run_id, old["run_id"], fid],
+                )
+                continue
             if fid not in seen:
                 counts["resolved"] += 1
                 self.con.execute(

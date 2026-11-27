@@ -98,3 +98,61 @@ def test_old_suggestions_are_recomputed_but_choices_are_not():
     merged = merge_selection([DEV, SA2], current)["resources"]
     assert merged["/sa/acct2"]["selected"] is False
     assert merged["/ws/dev"] == {"selected": True, "by": "maria"}
+
+
+def test_storage_is_found_from_table_paths_when_locations_are_not_visible():
+    from cosmosproof.config import AutoStorage, ScanConfig
+    from cosmosproof.scan import _auto_storage
+    from cosmosproof.unity_catalog import Activity, CatalogSnapshot, TableInfo
+
+    tables = [
+        TableInfo(
+            "c.s.a", "EXTERNAL", "o", "abfss://lake@acct1.dfs.core.windows.net/raw/a", "DELTA", None
+        ),
+        TableInfo(
+            "c.s.b", "EXTERNAL", "o", "abfss://lake@acct1.dfs.core.windows.net/raw/b", "DELTA", None
+        ),
+        TableInfo(
+            "c.s.c", "EXTERNAL", "o", "abfss://x@acct9.dfs.core.windows.net/c", "DELTA", None
+        ),
+        TableInfo(
+            "c.s.d",
+            "MANAGED",
+            "o",
+            "abfss://reports@acct1.dfs.core.windows.net/uc/d",
+            "DELTA",
+            None,
+        ),
+    ]
+    config = ScanConfig(auto_storage=AutoStorage(accounts=["acct1"], exclude=["reports@acct1"]))
+    found = _auto_storage(config, CatalogSnapshot(tables, Activity()))
+    assert [(s.account, s.container, s.list_directly) for s in found] == [("acct1", "lake", True)]
+
+
+def test_unverified_resources_keep_their_findings_open(tmp_path):
+    from datetime import UTC, datetime
+
+    from cosmosproof.demo import demo_report
+
+    findings = demo_report().findings
+    with AuditStore(tmp_path / FILE_NAME) as store:
+        store.record_run(
+            "r1",
+            datetime(2026, 11, 27, tzinfo=UTC),
+            "t",
+            1,
+            [("/ws/prd", f) for f in findings],
+            1,
+            0,
+        )
+        # Next run: the workspace scanned but saw no storage, so it is not judged.
+        counts = store.record_run(
+            "r2", datetime(2026, 11, 28, tzinfo=UTC), "t", 1, [], 1, 0, judged=set()
+        )
+        assert counts == {"new": 0, "ongoing": len(findings), "resolved": 0}
+        assert store.kpis()["open_findings"] == len(findings)
+        # A judged run with nothing found does resolve them.
+        counts = store.record_run(
+            "r3", datetime(2026, 11, 29, tzinfo=UTC), "t", 1, [], 1, 0, judged={"/ws/prd"}
+        )
+        assert counts["resolved"] == len(findings)

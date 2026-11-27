@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The daily job and the Marketplace package run `cosmosproof audit`; storage is also found from table paths; findings of unverified resources stay open instead of resolving.
 - The CosmosProof app (Databricks App): overview, resource selection and connections, over `cosmosproof.audit`.
 - `cosmosproof discover` and `cosmosproof audit`: estate-wide discovery, selection and audit into `cosmosproof.audit` (DuckDB metric model) with a Parquet export.
 - The scanner image is public; the Marketplace package was test-deployed with the full customer journey.

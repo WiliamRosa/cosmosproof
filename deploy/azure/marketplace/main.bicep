@@ -3,35 +3,31 @@
 // Deploys into the managed resource group, in the customer's subscription: a user-assigned
 // managed identity, a Log Analytics workspace for the scanner output, a storage account for
 // published runs (the only place CosmosProof writes) and a daily Container Apps Job.
-// Access to the customer's Databricks and ADLS is granted by the customer after deployment,
-// with the commands `cosmosproof grants` prints for the identity in the outputs.
+// The daily job runs `cosmosproof audit`: discovery over the chosen scope, the selection made
+// in the app, and cosmosproof.audit with its Parquet model (ADR 0010). Access to the
+// customer's resources is granted by the customer; the app shows what is missing.
 //
 // Compile to mainTemplate.json with: az bicep build --file main.bicep --outfile mainTemplate.json
 
 @description('Location for all resources.')
 param location string = resourceGroup().location
 
-@description('Azure Databricks workspace host, e.g. adb-1234567890123456.7.azuredatabricks.net.')
-param databricksHost string
+@description('Discovery scope: subscriptions or managementGroups.')
+@allowed([ 'subscriptions', 'managementGroups' ])
+param scopeType string = 'subscriptions'
 
-@description('ID of the SQL warehouse CosmosProof queries.')
-param warehouseId string
-
-@description('ADLS Gen2 account to scan.')
-param storageAccountName string
-
-@description('Container to scan in that account.')
-param storageContainer string
+@description('Comma-separated subscription IDs or management group IDs to discover. The identity needs Reader on them.')
+param scopeIds string
 
 @description('No read in this many days means unused.')
 @minValue(1)
 @maxValue(395)
 param windowDays int = 90
 
-@description('Date last access time tracking was enabled on the account (yyyy-mm-dd), or empty if it is off.')
+@description('Date last access time tracking was enabled on the ADLS accounts (yyyy-mm-dd), or empty if it is off.')
 param accessTrackingSince string = ''
 
-@description('Daily scan time, as a cron expression in UTC.')
+@description('Daily audit time, as a cron expression in UTC.')
 param cron string = '0 6 * * *'
 
 @description('Scanner image. Fixed by the publisher.')
@@ -43,33 +39,21 @@ param partnerCenterPid string = ''
 var suffix = uniqueString(resourceGroup().id)
 var reportsAccountName = take('cpreports${suffix}', 24)
 var reportsContainer = 'cosmosproof-reports'
-var trackingLine = empty(accessTrackingSince) ? '' : '\n    access_tracking_since: ${accessTrackingSince}'
-var scanConfig = format(
-  '''window_days: {0}
-databricks:
-  source:
-    type: databricks
-    max_rows: 1000000
-    timeout_seconds: 600
-    options:
-      server_hostname: {1}
-      http_path: /sql/1.0/warehouses/{2}
-      auth: azure
-storage:
-  - account: {3}
-    container: {4}
-    list_directly: true{5}
-publish: abfss://{6}@{7}.dfs.{8}/runs
-''',
-  windowDays,
-  databricksHost,
-  warehouseId,
-  storageAccountName,
-  storageContainer,
-  trackingLine,
+var scopeKey = scopeType == 'subscriptions' ? 'subscriptions' : 'management_groups'
+var trackingBlock = empty(accessTrackingSince) ? '' : 'storage:\n  access_tracking_since: ${accessTrackingSince}\n'
+var auditConfig = format(
+  '''location: abfss://{0}@{1}.dfs.{2}/audit
+discovery:
+  {3}: [{4}]
+window_days: {5}
+{6}''',
   reportsContainer,
   reportsAccountName,
-  environment().suffixes.storage
+  environment().suffixes.storage,
+  scopeKey,
+  scopeIds,
+  windowDays,
+  trackingBlock
 )
 
 // Partner Center customer usage attribution: a no-op deployment named after the offer's ID.
@@ -179,7 +163,7 @@ resource job 'Microsoft.App/jobs@2024-03-01' = {
       secrets: [
         {
           name: 'scan-config'
-          value: scanConfig
+          value: auditConfig
         }
       ]
     }
@@ -188,7 +172,7 @@ resource job 'Microsoft.App/jobs@2024-03-01' = {
         {
           name: 'scanner'
           image: image
-          args: [ 'scan', '--markdown', '/tmp/report.md' ]
+          args: [ 'audit' ]
           env: [
             { name: 'COSMOSPROOF_CONFIG', secretRef: 'scan-config' }
             { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
@@ -210,8 +194,8 @@ output identityClientId string = identity.properties.clientId
 @description('Object (principal) ID of the CosmosProof identity, for Azure role assignments.')
 output identityPrincipalId string = identity.properties.principalId
 
-@description('Where each run is published.')
-output publishLocation string = 'abfss://${reportsContainer}@${reportsAccountName}.dfs.${environment().suffixes.storage}/runs'
+@description('Where cosmosproof.audit, the selection and the Parquet model live.')
+output auditLocation string = 'abfss://${reportsContainer}@${reportsAccountName}.dfs.${environment().suffixes.storage}/audit'
 
-@description('Print the grants to give, for a person to review and run.')
-output grantsCommand string = 'cosmosproof grants --application-id ${identity.properties.clientId} --object-id ${identity.properties.principalId} --subscription ${subscription().subscriptionId} --storage <resource-group>/${storageAccountName} --catalog <catalog>'
+@description('Next steps: grant Reader on the discovery scope, then install the app in a home workspace.')
+output nextSteps string = 'Grant Reader to object ${identity.properties.principalId} on: ${scopeIds}. Then a Databricks workspace administrator runs app/deploy.py with --identity-app-id ${identity.properties.clientId}.'

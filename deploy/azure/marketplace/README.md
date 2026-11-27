@@ -9,7 +9,7 @@
 | Storage account + `cosmosproof-reports` container | Published runs; the identity can write **only** there |
 | Container Apps environment + Job | The daily scan |
 
-The wizard (`createUiDefinition.json`) asks for the Databricks workspace host, the SQL warehouse, the ADLS account and container to scan, the window and the schedule. The deployment outputs give the identity's IDs and the exact `cosmosproof grants` command to print what the customer must grant.
+The wizard (`createUiDefinition.json`) asks only for the discovery scope (subscriptions or a management group), the window and the schedule: workspaces and ADLS accounts are discovered, and people choose what to analyze in the app. The daily job runs `cosmosproof audit` and keeps `cosmosproof.audit` in the reports storage. The deployment outputs give the identity's IDs and the next steps: Reader on the scope, then a workspace administrator installs the app with `app/deploy.py`.
 
 ## Build
 

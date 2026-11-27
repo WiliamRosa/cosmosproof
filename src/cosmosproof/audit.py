@@ -22,7 +22,14 @@ from cosmos_semantic.connectors import _expand_env
 from pydantic import BaseModel, ConfigDict, Field
 
 from cosmosproof import __version__
-from cosmosproof.config import AccessLogs, DatabricksConfig, Rates, ScanConfig, StorageConfig
+from cosmosproof.config import (
+    AccessLogs,
+    AutoStorage,
+    DatabricksConfig,
+    Rates,
+    ScanConfig,
+    StorageConfig,
+)
 from cosmosproof.discovery import (
     Resource,
     enrich_workspace,
@@ -154,6 +161,12 @@ def scan_config_for(
             )
             for account, container in containers
         ],
+        auto_storage=AutoStorage(
+            accounts=sorted(storage_selected),
+            exclude=[f"{own[1]}@{own[0]}"] if own else [],
+            access_tracking_since=config.storage.access_tracking_since,
+            access_logs=config.storage.access_logs,
+        ),
     )
 
 
@@ -172,6 +185,7 @@ def run_audit(
         local = Path(tmp) / FILE_NAME
         etag = target.download(FILE_NAME, local)
         findings = []
+        judged: set[str] = set()
         scanned = failed = 0
         with AuditStore(local) as store:
             store.upsert_resources(resources, chosen)
@@ -196,12 +210,24 @@ def run_audit(
                     )
                     continue
                 scanned += 1
+                if report.storage_files or not any(
+                    "Storage-only mode" in n for n in report.coverage_notes
+                ):
+                    judged.add(ws.id)
+                else:
+                    store.log(
+                        run_id,
+                        "warning",
+                        "No storage was visible and lineage is unavailable: previous findings "
+                        "are kept, not resolved.",
+                        ws.id,
+                    )
                 findings.extend((ws.id, f) for f in report.findings)
                 store.record_resource_scan(run_id, ws.id, status="ok", report=report)
                 store.log(run_id, "info", f"{len(report.findings)} findings", ws.id)
             window = config.window_hours / 24 if config.window_hours else config.window_days
             counts = store.record_run(
-                run_id, started, __version__, window, findings, scanned, failed
+                run_id, started, __version__, window, findings, scanned, failed, judged=judged
             )
             kpis = store.kpis()
             model = store.export_parquet(Path(tmp) / "model")

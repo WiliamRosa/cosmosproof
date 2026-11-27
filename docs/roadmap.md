@@ -52,7 +52,7 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 - [x] Multi-workspace audit cycle that survives failing resources
 - [x] `cosmosproof.audit` DuckDB metric model with KPI views and Parquet export, validated live
 - [x] Web app (Databricks App, Streamlit, Portuguese and English): overview with KPIs and charts, resource selection with a non-production bulk action, connections status with an access script; installed with `app/deploy.py`, running on the Azure test workspace
-- [ ] Scheduled job and Marketplace package switched to `cosmosproof audit`
+- [x] Scheduled job and Marketplace package switched to `cosmosproof audit`; the wizard asks only for the scope, window and schedule; validated with the managed identity
 
 ## Before selling
 
