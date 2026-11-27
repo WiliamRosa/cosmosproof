@@ -38,7 +38,9 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 - [x] Grant script generator (`cosmosproof grants`): Databricks SQL grants, read-only Azure role, access tracking, inventory policy. Azure commands run successfully on a real ADLS Gen2 account (2026-11-27); system catalog grants need a Databricks account admin
 - [ ] Managed Application template ([ADR 0003](decisions/0003-azure-marketplace-managed-application.md))
 - [ ] VNet-integrated option for private endpoints
-- [ ] Owner-based showback and alert delivery
+- [x] Scheduled scans on Azure Container Apps Jobs with a managed identity, Entra ID auth to Databricks, publish contract (runs, findings with status, summaries) and Databricks AI/BI dashboard ([ADR 0007](decisions/0007-continuous-monitoring.md)), running daily on the Azure test tenant
+- [ ] Azure Monitor alert rule and action group (KQL documented in deploy/azure)
+- [ ] Owner-based showback in the dashboard
 
 ## Before selling
 

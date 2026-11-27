@@ -91,10 +91,21 @@ class ScanConfig(BaseModel):
     )
     databricks: DatabricksConfig | None = None
     storage: list[StorageConfig] = []
+    publish: str | None = Field(
+        None,
+        description=(
+            "Where each run is published for monitoring: an abfss:// URL CosmosProof owns, or a "
+            "local folder. The only place CosmosProof ever writes."
+        ),
+    )
     rates: Rates | None = None
 
 
 def load_config(path: str | Path) -> ScanConfig:
     with Path(path).open(encoding="utf-8") as fh:
-        raw = yaml.safe_load(fh) or {}
+        return parse_config(fh.read())
+
+
+def parse_config(text: str) -> ScanConfig:
+    raw = yaml.safe_load(text) or {}
     return ScanConfig.model_validate(_expand_env(raw))

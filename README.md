@@ -70,6 +70,10 @@ cosmosproof ledger add -r today.json -f ab8825127671 -a "moved to Cool" --by dat
 cosmosproof ledger summary                   # realized monthly savings, each tied to a proof hash
 ```
 
+## Monitor it continuously
+
+Run the scanner on a schedule and publish every run to a location CosmosProof owns (`publish:`). Each run writes the full report, one row per finding with its status (new, ongoing, resolved since the previous run) and a run summary. A Databricks AI/BI dashboard reads them through Unity Catalog, and an Azure Monitor alert can fire on new findings. The reference setup runs as an Azure Container Apps Job with a managed identity and no stored credential: see [deploy/azure](deploy/azure/README.md) and [ADR 0007](docs/decisions/0007-continuous-monitoring.md).
+
 ## How confidence works
 
 | Confidence | When |
