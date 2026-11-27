@@ -162,3 +162,26 @@ def test_badges_keep_black_text_in_both_themes():
 
     for theme in ("light", "dark"):
         assert ".stApp span.cp-badge { color: #1f2328 !important; }" in ui.css(theme)
+
+
+def test_page_arrows(tmp_path, monkeypatch):
+    import cosmosproof.audit as audit
+    from cosmosproof.demo import demo_report
+
+    report = demo_report()
+    many = []
+    for i in range(3):  # 15 findings with distinct ids: two pages of 10
+        many += [f.model_copy(update={"id": f"{f.id}{i}"}) for f in report.findings]
+    monkeypatch.setattr(audit, "run_scan", lambda cfg: report.model_copy(update={"findings": many}))
+    config = parse_audit_config(f"location: {tmp_path.as_posix()}\n")
+    run_audit(config, discovered=([WS, SA], merge_selection([WS, SA], {})))
+
+    at = _app(tmp_path, monkeypatch).run()
+    assert at.button(key="findings_prev").disabled and at.button(key="findings_first").disabled
+    at.button(key="findings_next").click().run()
+    text = "".join(m.value for m in at.markdown)
+    assert "Página 2 de 2" in text
+    assert text.count('class="cp-card"') == 5
+    assert at.button(key="findings_last").disabled
+    at.button(key="findings_first").click().run()
+    assert "Página 1 de 2" in "".join(m.value for m in at.markdown)

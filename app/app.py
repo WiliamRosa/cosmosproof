@@ -111,14 +111,66 @@ def chart(frame: pd.DataFrame, kind: str, x: str, y: str, theme: str, horizontal
     )
 
 
-def pager(key: str, total: int, labels: dict, sizes=(10, 25, 50)) -> tuple[int, int]:
-    left, right = st.columns(2)
-    size = left.selectbox(labels["per_page"], sizes, key=f"{key}_size")
-    pages = max(1, -(-total // size))
-    number = right.number_input(
-        f"{labels['page']} (1–{pages})", min_value=1, max_value=pages, value=1, key=f"{key}_page"
+def page_size(key: str, labels: dict, sizes=(10, 25, 50)) -> int:
+    left, _ = st.columns([1, 3])
+    return int(left.selectbox(labels["per_page"], sizes, key=f"{key}_size"))
+
+
+def current_page(key: str, pages: int) -> int:
+    """The page kept in session, clamped when filters or the page size shrink the list."""
+    number = min(max(int(st.session_state.get(f"{key}_page", 1)), 1), pages)
+    st.session_state[f"{key}_page"] = number
+    return number
+
+
+def page_nav(key: str, number: int, pages: int, labels: dict) -> None:
+    """Arrows at the end of the list: first, previous, position, next, last."""
+
+    def go(target: int) -> None:
+        st.session_state[f"{key}_page"] = target
+
+    first, prev, middle, nxt, last = st.columns([1, 1, 2, 1, 1])
+    first.button(
+        "⏮",
+        key=f"{key}_first",
+        help=labels["first"],
+        disabled=number <= 1,
+        on_click=go,
+        args=(1,),
+        width="stretch",
     )
-    return int(number), int(size)
+    prev.button(
+        "‹",
+        key=f"{key}_prev",
+        help=labels["previous"],
+        disabled=number <= 1,
+        on_click=go,
+        args=(number - 1,),
+        width="stretch",
+    )
+    middle.markdown(
+        f'<div class="cp-muted" style="text-align:center;padding-top:8px">'
+        f"{labels['page_of'].format(page=number, pages=pages)}</div>",
+        unsafe_allow_html=True,
+    )
+    nxt.button(
+        "›",
+        key=f"{key}_next",
+        help=labels["next"],
+        disabled=number >= pages,
+        on_click=go,
+        args=(number + 1,),
+        width="stretch",
+    )
+    last.button(
+        "⏭",
+        key=f"{key}_last",
+        help=labels["last"],
+        disabled=number >= pages,
+        on_click=go,
+        args=(pages,),
+        width="stretch",
+    )
 
 
 # --- sidebar and theme ---------------------------------------------------------------------
@@ -208,8 +260,10 @@ with tab_overview:
             + ui.legend(sorted({f["resource_group"] or "" for f in shown})),
             unsafe_allow_html=True,
         )
-        number, size = pager("findings", len(shown), T)
-        items, pages = ui.page(shown, number, size)
+        size = page_size("findings", T)
+        pages = max(1, -(-len(shown) // size))
+        number = current_page("findings", pages)
+        items, _ = ui.page(shown, number, size)
         st.markdown(
             "".join(
                 ui.finding_card(
@@ -229,6 +283,7 @@ with tab_overview:
             + "</div>",
             unsafe_allow_html=True,
         )
+        page_nav("findings", number, pages, T)
 
 # --- resources -----------------------------------------------------------------------------
 
@@ -266,7 +321,9 @@ with tab_resources:
             resource_rows,
             key=lambda r: (r["subscription"], r["resource_group"], r["kind"], r["name"]),
         )
-        number, size = pager("resources", len(ordered), T, sizes=(20, 50, 100))
+        size = page_size("resources", T, sizes=(20, 50, 100))
+        res_pages = max(1, -(-len(ordered) // size))
+        number = current_page("resources", res_pages)
         items, _ = ui.page(ordered, number, size)
         current_group = None
         for r in items:
@@ -304,6 +361,7 @@ with tab_resources:
                 f"{html.escape(r['environment_source'] or '—')}</span>",
                 unsafe_allow_html=True,
             )
+        page_nav("resources", number, res_pages, T)
         if st.button(T["save"], type="primary"):
             current = json.loads(read_bytes("selection.json") or b"{}")
             write_text(
