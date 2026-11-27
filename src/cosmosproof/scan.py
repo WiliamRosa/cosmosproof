@@ -21,6 +21,25 @@ MISSING_GRANTS = (
 )
 
 
+# The Entra ID application of Azure Databricks; tokens for it authenticate SQL warehouses.
+AZURE_DATABRICKS_RESOURCE = "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
+
+
+def _with_azure_token(source):
+    """`options.auth: azure` gets an Entra ID token from the environment (managed identity,
+    Azure CLI login), so no Databricks secret is stored anywhere."""
+    if source.type != "databricks" or source.options.get("auth") != "azure":
+        return source
+    from azure.identity import DefaultAzureCredential
+
+    token = DefaultAzureCredential(exclude_interactive_browser_credential=True).get_token(
+        f"{AZURE_DATABRICKS_RESOURCE}/.default"
+    )
+    options = {k: v for k, v in source.options.items() if k != "auth"}
+    options["access_token"] = token.token
+    return source.model_copy(update={"options": options})
+
+
 class ScanError(Exception):
     """A scan cannot start; the message says what to do."""
 
@@ -33,8 +52,8 @@ def run_scan(
 ) -> Report:
     reference = config.reference_date or date.today()
     if config.databricks is None:
-        raise ValueError("the configuration needs a `databricks` section")
-    con = connector or connect(config.databricks.source)
+        raise ScanError("the configuration needs a `databricks` section")
+    con = connector or connect(_with_azure_token(config.databricks.source))
     names = config.databricks.system_tables
     producer_notes: list[str] = []
     producers: ProducerActivity | None = None

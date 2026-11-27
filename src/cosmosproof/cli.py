@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 
 from cosmosproof import __version__
-from cosmosproof.config import load_config
+from cosmosproof.config import load_config, parse_config
 from cosmosproof.model import Report
 from cosmosproof.report import (
     LedgerEntry,
@@ -48,21 +48,47 @@ def version() -> None:
 
 @app.command()
 def scan(
-    config: Path = typer.Option(..., "--config", "-c", help="cosmosproof.yml"),
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="cosmosproof.yml. Without it, the YAML is read from the COSMOSPROOF_CONFIG variable.",
+    ),
     out: Path | None = typer.Option(None, "--out", "-o", help="Write the report as JSON."),
     markdown: Path | None = typer.Option(
         None, "--markdown", "-m", help="Write the report as Markdown."
     ),
+    publish_to: str | None = typer.Option(
+        None, "--publish", help="Publish the run for monitoring (overrides `publish`)."
+    ),
 ) -> None:
     """Scan Unity Catalog and ADLS inventories and report unused data with evidence."""
+    import os
+
     from cosmosproof.scan import ScanError, run_scan
 
+    if config is not None:
+        settings = load_config(config)
+    elif os.environ.get("COSMOSPROOF_CONFIG"):
+        settings = parse_config(os.environ["COSMOSPROOF_CONFIG"])
+    else:
+        raise typer.BadParameter("give --config or set COSMOSPROOF_CONFIG")
     try:
-        report = run_scan(load_config(config))
+        report = run_scan(settings)
     except ScanError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(2) from exc
     _write(report, out, markdown)
+    location = publish_to or settings.publish
+    if location:
+        from cosmosproof.publish import publish, target_for
+
+        counts = publish(report, target_for(location))
+        typer.echo(
+            f"published to {location}: {counts['new']} new, {counts['ongoing']} ongoing, "
+            f"{counts['resolved']} resolved",
+            err=True,
+        )
 
 
 @app.command()

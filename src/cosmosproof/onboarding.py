@@ -73,7 +73,8 @@ def databricks_grants(application_id: str, catalogs: list[str]) -> str:
     )
     lines += [f"GRANT BROWSE ON CATALOG `{c}` TO {who};" for c in catalogs]
     lines.append(
-        "-- Also give the identity CAN USE on one SQL warehouse (warehouse > Permissions)."
+        "-- Also give the identity CAN USE on one SQL warehouse (warehouse > Permissions) and the "
+        "Databricks SQL access entitlement (workspace settings > identity)."
     )
     return "\n".join(lines)
 
