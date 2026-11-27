@@ -102,7 +102,29 @@ def test_app_renders_results(audit_dir, monkeypatch):
     labels = [m.label for m in at.metric]
     assert "Achados abertos" in labels and "PII parado" in labels
     assert int(at.metric[0].value) == len(demo_report().findings)
-    assert len(at.expander) == len(demo_report().findings)
+    cards = "".join(m.value for m in at.markdown).count('class="cp-card"')
+    assert cards == len(demo_report().findings)
+
+
+def test_app_dark_mode_and_pagination(audit_dir, monkeypatch):
+    at = _app(audit_dir, monkeypatch).run()
+    at.toggle(key="dark_mode").set_value(True).run()
+    assert not at.exception
+    css = "".join(m.value for m in at.markdown)
+    assert "#0f1419" in css  # dark background
+    at.selectbox(key="findings_size").set_value(10).run()
+    assert "página 1 de 1" in "".join(m.value for m in at.markdown)
+
+
+def test_app_resource_toggles_and_leave_out(audit_dir, monkeypatch):
+    at = _app(audit_dir, monkeypatch).run()
+    toggles = [t for t in at.toggle if str(t.key).startswith("sel::")]
+    assert {t.key for t in toggles} == {"sel::/ws/prd", "sel::/ws/dev", "sel::/sa/acct1"}
+    at.toggle(key="sel::/ws/dev").set_value(True).run()
+    assert at.session_state["choices"]["/ws/dev"] is True
+    next(b for b in at.button if b.label.startswith("Deixar de fora")).click().run()
+    assert at.session_state["choices"]["/ws/dev"] is False
+    assert at.session_state["choices"]["/ws/prd"] is True
 
 
 def test_app_saves_the_selection(audit_dir, monkeypatch):
@@ -119,3 +141,17 @@ def test_app_without_any_run(tmp_path, monkeypatch):
     at = _app(tmp_path, monkeypatch).run()
     assert not at.exception
     assert any("Ainda não há nenhuma execução" in i.value for i in at.info)
+
+
+def test_ui_escapes_and_colors():
+    import ui
+
+    card = ui.finding_card(
+        {"asset": "<script>x</script>", "reading": "cost", "confidence": "high",
+         "owner": "a@b", "resource_group": "rg-1", "proof_hash": "sha256:1"},
+        logic.TEXT["en"], "light", [{"source": "s", "signal": "<b>"}], [],
+    )  # fmt: skip
+    assert "<script>" not in card and "&lt;script&gt;" in card and "&lt;b&gt;" in card
+    assert ui.color_for("rg-1") == ui.color_for("RG-1")
+    assert ui.page(list(range(23)), 3, 10) == ([20, 21, 22], 3)
+    assert ui.page([], 5, 10) == ([], 1)
