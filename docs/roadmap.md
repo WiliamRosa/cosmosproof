@@ -30,7 +30,7 @@ Phases follow [ADR 0001](decisions/0001-name-scope-and-promise.md).
 
 ## Phase 3: Federation and database-side statistics
 
-- [ ] Unused federation connections that hold production credentials
+- [x] Unused federation connections that hold production credentials ([ADR 0009](decisions/0009-risk-reading-federation.md)); connection discovery validated live, verdict needs lineage
 - [ ] `pg_stat_user_tables` and `sys.dm_db_index_usage_stats` to separate "nobody reads it" from "only Databricks doesn't read it"
 - [ ] Ingest-or-federate recommendation from real usage
 
