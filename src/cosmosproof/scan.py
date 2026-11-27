@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 
 from cosmos_semantic.connectors import Connector, connect
+from cosmos_semantic.errors import ConnectorError
 
 from cosmosproof import __version__
 from cosmosproof.analyzer import Analyzer
@@ -13,6 +14,16 @@ from cosmosproof.inventory import read_inventory
 from cosmosproof.model import Report
 from cosmosproof.producers import ProducerActivity, read_producers
 from cosmosproof.unity_catalog import CatalogSnapshot, read_catalog
+
+MISSING_GRANTS = (
+    "The scanning identity cannot read the Unity Catalog system tables (system.access). "
+    "Only a Databricks account admin can grant them; workspace and metastore admins cannot. "
+    "Run `cosmosproof grants` and have an account admin run the SQL section."
+)
+
+
+class ScanError(Exception):
+    """A scan cannot start; the message says what to do."""
 
 
 def run_scan(
@@ -29,7 +40,12 @@ def run_scan(
     producer_notes: list[str] = []
     producers: ProducerActivity | None = None
     try:
-        snapshot: CatalogSnapshot = read_catalog(con, names, reference)
+        try:
+            snapshot: CatalogSnapshot = read_catalog(con, names, reference)
+        except ConnectorError as exc:
+            if "INSUFFICIENT_PERMISSIONS" in str(exc) or "PERMISSION_DENIED" in str(exc):
+                raise ScanError(MISSING_GRANTS) from exc
+            raise
         if config.databricks.producers:
             try:
                 producers = read_producers(con, names, reference, config.window_days)

@@ -127,3 +127,19 @@ def test_list_price_discount(duck):
     )
     assert producer.monthly_cost == round(7.0 * 0.75 / 180 * 30, 2)
     assert any("25% discount" in n for n in producer.coverage_notes)
+
+
+def test_missing_system_table_grants_give_a_clear_error():
+    import pytest
+    from cosmos_semantic.connectors import Connector, DataSourceConfig
+    from cosmos_semantic.errors import ConnectorError
+
+    from cosmosproof.scan import ScanError
+
+    class Denied(Connector):
+        def _run(self, sql, fetch_limit):
+            raise ConnectorError("[INSUFFICIENT_PERMISSIONS] no USE SCHEMA on system.access")
+
+    config = ScanConfig(databricks=DatabricksConfig(source={"type": "duckdb"}))
+    with pytest.raises(ScanError, match="account admin"):
+        run_scan(config, connector=Denied(DataSourceConfig(type="duckdb")))

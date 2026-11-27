@@ -29,3 +29,11 @@ The Cosmos Semantic template is the starting point, keeping the lessons above.
 - **Networking is the main gap for banks.** Storage and Databricks are usually behind private endpoints, so the app must be able to run inside the customer's virtual network. Public networking is enough for the first version; a VNet-integrated option is required before selling to a bank.
 - The container image must be pullable from the customer's tenant, so the code is effectively visible. Protection comes from the license and the service, not from secrecy.
 - The guided grant script is part of the product and must be tested as carefully as the code.
+
+## 2026-11-27 update: validation on a real Azure tenant
+
+Tested on an Azure Databricks Premium workspace with Unity Catalog and an ADLS Gen2 account, with a user-assigned managed identity standing in for CosmosProof's identity.
+
+- **Azure part, all generated commands worked as generated:** the read-only role assignment, last access tracking (it reports a one-day granularity), the management-plane container creation and the inventory policy (read back with every field, including `hdi_isfolder`).
+- **Databricks part:** `BROWSE` on a catalog works when run by the catalog owner. Every grant on the `system` catalog failed for a workspace admin: `USE CATALOG` needs `MANAGE` on `system`, and the schema grants need a **Databricks account admin**. Onboarding must therefore involve an account admin, which is a different (and usually more senior) person than the workspace admin. The generated script and the scan's error message now say so.
+- **Storage paths:** Unity Catalog reports external table locations as `abfss://<container>@<account>.dfs.core.windows.net/<path>`, the same form CosmosProof builds from inventory reports, so blobs map to tables without translation.
