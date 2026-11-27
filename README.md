@@ -1,6 +1,6 @@
 # CosmosProof
 
-**We show, with proof, what in your Azure Databricks costs money, creates risk or breaks the LGPD necessity principle without being used.**
+**We show, with proof, what in your Azure Databricks costs money, creates risk or holds PII without being used.**
 
 Most data lakes keep paying for data nobody reads. Existing tools either optimize compute or flag "unused" tables from a single signal and admit false positives. CosmosProof crosses Unity Catalog lineage with ADLS Gen2 storage activity, only calls something unused when the evidence agrees, and every finding says what it could not see.
 
@@ -10,9 +10,9 @@ One map, three readings:
 |---|---|
 | Cost (FinOps) | What am I paying for that nobody reads? |
 | Risk | Which production credentials and database loads exist with no real use? |
-| Compliance (LGPD) | Which personal data is stored with no purpose in use? |
+| Compliance (PII) | Which personal data is stored with no purpose in use? |
 
-> Status: pre-alpha. Phase 1 (ADLS Gen2 + Unity Catalog + LGPD reading) and phase 2 (jobs and pipelines, including Lakeflow Connect, that feed tables nobody reads, with their compute cost) work and were validated against real Unity Catalog system tables. See the [roadmap](docs/roadmap.md).
+> Status: pre-alpha. Phase 1 (ADLS Gen2 + Unity Catalog + PII reading) and phase 2 (jobs and pipelines, including Lakeflow Connect, that feed tables nobody reads, with their compute cost) work and were validated against real Unity Catalog system tables. See the [roadmap](docs/roadmap.md).
 
 ## Try it in one minute
 

@@ -1,13 +1,13 @@
 [project]
 name = "cosmosproof"
 version = "0.1.0.dev0"
-description = "Shows, with proof, what in your Azure Databricks costs money, creates risk or breaks the LGPD necessity principle without being used"
+description = "Shows, with proof, what in your Azure Databricks costs money, creates risk or holds PII without being used"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "BUSL-1.1"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Wiliam Rosa" }]
-keywords = ["azure", "databricks", "unity catalog", "adls", "finops", "lgpd", "unused data"]
+keywords = ["azure", "databricks", "unity catalog", "adls", "finops", "pii", "unused data"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Information Technology",

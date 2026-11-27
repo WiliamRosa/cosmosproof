@@ -457,8 +457,8 @@ class Analyzer:
                         "the content before acting.",
                     ],
                     recommendation=(
-                        "Personal data kept with no purpose in use conflicts with the LGPD "
-                        "necessity principle. Ask the owner and the DPO whether it must be "
+                        "PII kept with no purpose in use is a privacy liability. Ask the owner "
+                        "and the data protection officer whether it must be "
                         "retained, anonymized or deleted."
                     ),
                     details={"personal_columns": personal, **details},

@@ -31,14 +31,14 @@ It creates the `cosmosproof_lab` catalog and two jobs on the warehouse:
 | # | Asset | Situation | With lineage | Storage-only mode |
 |---|---|---|---|---|
 | S1 | `silver.contas_ativas` | Read every day | No finding | No finding |
-| S2 | `raw.clientes_legado_2019` | Personal data, never read | Unused table + LGPD, high | Unused table + LGPD, medium |
+| S2 | `raw.clientes_legado_2019` | Personal data, never read | Unused table + PII, high | Unused table + PII, medium |
 | S3 | `bronze.eventos_cdc` | Written every day, never read | Unused table, still fed; the producer job is dead | Unused table, medium |
 | S4 | `bronze.transacoes_raw` | Read only by the job that builds a used gold table | No finding | No finding |
 | S5 | `exports/campanha_2024` | Files no table owns, never read | Orphan path | Orphan path, medium |
 | S6 | `exports/parceiro_x` | Files no table owns, read by path every day | No finding | No finding |
 | S7 | `archive.historico_2020` | Never read, data files in Cool | Unused table, Cool cost | Unused table, medium, Cool cost |
 | S8 | `gold.relatorio_antigo` | Managed table, never read | Unused table | Unused table, medium |
-| S9 | `raw.clientes_copia` | Copy of S2 | Unused table + LGPD | Unused table + LGPD, medium |
+| S9 | `raw.clientes_copia` | Copy of S2 | Unused table + PII | Unused table + PII, medium |
 | S10 | `silver.saldos` | Only `COUNT(*)` every day | No finding | **Unused table (false positive)**: `COUNT(*)` is answered from Delta statistics and touches no data file |
 
 S10 is there on purpose: it shows the main limit of storage-only mode, which every Delta finding states.
@@ -66,7 +66,7 @@ Deployed, jobs run at 12:40 UTC, storage read logs on since 12:37 UTC, scanned w
 | # | Result |
 |---|---|
 | S1, S4, S6 | No finding, as expected (S4 read by the producer that builds a used gold table; S6 read by path) |
-| S2, S9 | Unused table + LGPD finding each, medium |
+| S2, S9 | Unused table + PII finding each, medium |
 | S3 | Unused table, medium (the producer only reads `_delta_log` when appending) |
 | S5 | Orphan path, medium; judged apart from S6 next to it because orphans are grouped by Delta table root |
 | S7 | Unused table, medium, data files in Cool |

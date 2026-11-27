@@ -18,7 +18,7 @@ def test_demo_report_has_all_kinds():
     assert kinds == {"unused_table", "orphan_path", "unused_personal_data", "unused_producer"}
     assert "main.silver.contas" not in {f.asset for f in report.findings}
     assert report.totals()["monthly_cost"]["USD"] > 0
-    assert "Compliance (LGPD)" in to_markdown(report)
+    assert "Compliance (PII)" in to_markdown(report)
 
 
 def test_scan_end_to_end_on_duckdb(duck, tmp_path):

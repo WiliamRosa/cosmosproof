@@ -5,7 +5,7 @@
 
 ## Context
 
-CosmosProof needs code Cosmos Semantic already has: the PostgreSQL, SQL Server and Databricks connectors, LGPD sensitivity detection by column name, and the configuration conventions. Cosmos Semantic ADR 0005 says commercial code lives in a separate repository that depends on the core like any other user. The Cosmos Semantic repository is public and runs an agent routine that opens and merges pull requests by itself.
+CosmosProof needs code Cosmos Semantic already has: the PostgreSQL, SQL Server and Databricks connectors, PII detection by column name, and the configuration conventions. Cosmos Semantic ADR 0005 says commercial code lives in a separate repository that depends on the core like any other user. The Cosmos Semantic repository is public and runs an agent routine that opens and merges pull requests by itself.
 
 The maintainer asked for a public repository with a license "open like Cosmos", but one that does not allow commercial use without permission.
 

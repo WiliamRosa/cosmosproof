@@ -1,5 +1,5 @@
 """CosmosProof: shows, with proof, what in your Azure Databricks costs money, creates risk or
-breaks the LGPD necessity principle without being used."""
+holds PII without being used."""
 
 from importlib.metadata import PackageNotFoundError, version
 

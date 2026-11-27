@@ -13,7 +13,7 @@ from cosmosproof.model import Report
 READING_TITLES = {
     "cost": "Cost (FinOps)",
     "risk": "Risk",
-    "compliance": "Compliance (LGPD)",
+    "compliance": "Compliance (PII)",
 }
 
 
