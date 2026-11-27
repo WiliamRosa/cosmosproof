@@ -99,8 +99,11 @@ def css(theme: str) -> str:
 .cp-body ul {{ margin: 4px 0 8px 18px; padding: 0; }}
 .cp-badge {{
   display: inline-block; border-radius: 999px; padding: 1px 9px; margin-right: 6px;
-  font-size: 0.75rem; font-weight: 600; color: #1f2328;
+  font-size: 0.75rem; font-weight: 600;
 }}
+/* Badges sit on pastel backgrounds in both themes: their text stays black, overriding the
+   theme rule that colors every span. */
+.stApp span.cp-badge {{ color: #1f2328 !important; }}
 .cp-proof {{ font-family: ui-monospace, monospace; font-size: 0.75rem; color: {t["muted"]};
   word-break: break-all; }}
 .cp-legend span {{ display: inline-block; margin: 0 12px 6px 0; font-size: 0.82rem; }}
