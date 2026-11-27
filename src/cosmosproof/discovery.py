@@ -18,7 +18,8 @@ GRAPH_QUERY = (
     " | where type =~ 'microsoft.databricks/workspaces'"
     " or (type =~ 'microsoft.storage/storageaccounts' and properties.isHnsEnabled == true)"
     " | project id, name, type, resourceGroup, subscriptionId, location, tags,"
-    " workspaceUrl = tostring(properties.workspaceUrl), sku = tostring(sku.name)"
+    " workspaceUrl = tostring(properties.workspaceUrl), sku = tostring(sku.name),"
+    " managedResourceGroup = tostring(properties.managedResourceGroupId)"
 )
 ENV_TAGS = ("env", "environment", "ambiente", "stage")
 # Order matters: the first match wins, so "prod-poc" is treated as non-production.
@@ -46,6 +47,9 @@ class Resource:
     warehouses: list[dict] = field(default_factory=list)
     catalogs: list[str] = field(default_factory=list)
     locations: list[str] = field(default_factory=list)  # abfss:// URLs of external locations
+    # Storage inside a workspace's managed resource group (DBFS root): Databricks denies direct
+    # access to it, so it follows its workspace and starts unselected.
+    managed_by: str | None = None
     status: str = "discovered"  # discovered, ready, error
     error: str | None = None
 
@@ -70,7 +74,7 @@ def suggest_environment(name: str, tags: dict[str, str]) -> tuple[str, str]:
 
 
 def selected_by_default(resource: Resource) -> bool:
-    return resource.environment in SELECTED_BY_DEFAULT
+    return resource.managed_by is None and resource.environment in SELECTED_BY_DEFAULT
 
 
 def parse_graph_rows(rows: list[dict]) -> list[Resource]:
@@ -92,6 +96,18 @@ def parse_graph_rows(rows: list[dict]) -> list[Resource]:
                 host=row.get("workspaceUrl") or None,
             )
         )
+    managed_groups = {
+        row["managedResourceGroup"].rsplit("/", 1)[-1].lower(): row["name"]
+        for row in rows
+        if row.get("managedResourceGroup")
+    }
+    by_name = {r.name: r for r in out if r.kind == "workspace"}
+    for r in out:
+        owner = managed_groups.get(r.resource_group.lower()) if r.kind == "storage" else None
+        if owner:
+            r.managed_by = owner
+            r.environment = by_name[owner].environment
+            r.environment_source = "workspace"
     return sorted(out, key=lambda r: (r.kind, r.name))
 
 

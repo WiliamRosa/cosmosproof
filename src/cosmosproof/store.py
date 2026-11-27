@@ -129,6 +129,8 @@ class AuditStore:
         self.path = Path(path)
         self.con = duckdb.connect(str(self.path))
         self.con.execute(DDL)
+        # Additive migrations for stores created by earlier versions.
+        self.con.execute("ALTER TABLE dim_resource ADD COLUMN IF NOT EXISTS managed_by VARCHAR")
         self.con.execute(
             "INSERT OR REPLACE INTO meta VALUES ('schema_version', ?)", [str(SCHEMA_VERSION)]
         )
@@ -150,8 +152,12 @@ class AuditStore:
         for r in resources:
             self.con.execute(
                 """
-                INSERT INTO dim_resource VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (resource_id) DO UPDATE SET
+                INSERT INTO dim_resource (
+                    resource_id, kind, name, subscription, resource_group, location, tags,
+                    environment, environment_source, host, selected, status, error, warehouses,
+                    catalogs, locations, first_seen, last_seen, managed_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (resource_id) DO UPDATE SET managed_by = excluded.managed_by,
                     kind = excluded.kind, name = excluded.name, subscription = excluded.subscription,
                     resource_group = excluded.resource_group, location = excluded.location,
                     tags = excluded.tags, environment = excluded.environment,
@@ -164,7 +170,7 @@ class AuditStore:
                     r.id, r.kind, r.name, r.subscription, r.resource_group, r.location,
                     json.dumps(r.tags), r.environment, r.environment_source, r.host,
                     selection.get(r.id, False), r.status, r.error, json.dumps(r.warehouses),
-                    json.dumps(r.catalogs), json.dumps(r.locations), now, now,
+                    json.dumps(r.catalogs), json.dumps(r.locations), now, now, r.managed_by,
                 ],
             )  # fmt: skip
 

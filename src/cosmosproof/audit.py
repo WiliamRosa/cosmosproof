@@ -82,7 +82,10 @@ def merge_selection(resources: list[Resource], current: dict) -> dict:
     """New resources get the suggested default; choices already made are never changed."""
     chosen = dict(current.get("resources", {}))
     for r in resources:
-        chosen.setdefault(r.id, {"selected": selected_by_default(r), "by": "suggestion"})
+        previous = chosen.get(r.id)
+        # Suggestions are recomputed (rules improve); a person's choice is never touched.
+        if previous is None or previous.get("by") == "suggestion":
+            chosen[r.id] = {"selected": selected_by_default(r), "by": "suggestion"}
     return {**current, "resources": chosen}
 
 
