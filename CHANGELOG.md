@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The CosmosProof app (Databricks App): overview, resource selection and connections, over `cosmosproof.audit`.
 - `cosmosproof discover` and `cosmosproof audit`: estate-wide discovery, selection and audit into `cosmosproof.audit` (DuckDB metric model) with a Parquet export.
 - The scanner image is public; the Marketplace package was test-deployed with the full customer journey.
 - Risk reading: unused Lakehouse Federation connections (`unused_connection`), with ingestion pipelines that use a connection excluded.
